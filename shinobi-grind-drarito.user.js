@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.57.0
+// @version     14.58.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.57-Drarito';
+  const VERSION = 'V14.58-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -7820,6 +7820,7 @@
       CFG.djChoisi = id; CFG.mode = 'donjons'; sauve(); S.objLabel = ''; S.djVouluDit = ''; affiche();
       return tgDit('⚔️ Mode Donjons : j’enchaîne ' + nomDj(id) + ' (' + nbEnSac('clef-' + id) + ' clef(s) en sac' + (nbEnSac('clef-' + id) ? '' : ', je farme sa clef d’abord') + ').');
     }
+    if (cmd === '/aokiri') { if (/^(on|oui|1)/i.test(arg.trim())) { CFG.aokiri = 1; CFG.mode = 'quetes'; } else if (/^(off|non|0)/i.test(arg.trim())) CFG.aokiri = 0; sauve(); return tgDit('🌊 Option Aokiri : ' + (Number(CFG.aokiri) === 1 ? 'activée (coffres, puis quêtes, puis farm au Pays de l’Eau)' : 'désactivée (quêtes sur tout le continent)') + '\n/aokiri on ou /aokiri off'); }
     if (cmd === '/intuable') { if (/^(on|oui|1)/i.test(arg.trim())) CFG.intuable = 1; else if (/^(off|non|0)/i.test(arg.trim())) CFG.intuable = 0; sauve(); return tgDit('🛡 Mode Intuable : ' + (INTU() ? 'activé (97 % de chances minimum, jamais plus de la moitié de mes PV en jeu, repos à 95 %, soins plus tôt)' : 'désactivé') + '\n/intuable on | off'); }
     if (cmd === '/mode') {
       const m = { tresor: 'tresor', tresors: 'tresor', 'trésor': 'tresor', 'trésors': 'tresor', treasure: 'tresor', coffre: 'tresor', coffres: 'tresor', groupe: 'groupe', afk: 'groupe', allies: 'groupe', xp: 'xp', quete: 'quetes', quetes: 'quetes', 'quêtes': 'quetes', farm: 'farm', boss: 'boss', donjon: 'donjons', donjons: 'donjons', dj: 'donjons', cles: 'cles', clefs: 'cles', cle: 'cles', clef: 'cles', test: 'test', bestiaire: 'test', ryo: 'ryo', ryos: 'ryo', 'ryō': 'ryo', 'ryōs': 'ryo', argent: 'ryo' }[arg.toLowerCase()];
@@ -8642,6 +8643,7 @@
         const v = CFG.djChoisi, ko = v && (B.djKO || {})[v] > Date.now(), pd = v && (B.djPerdu || {})[v];
         if (ko || pd) { const b = el('button', 'b large', '▶ Relancer ' + nomDj(v) + ' maintenant (en pause ' + (ko ? Math.ceil((B.djKO[v] - Date.now()) / 60000) + ' min' : 'jusqu’au niveau ' + pd) + ')'); b.onclick = () => { if (B.djKO) delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; if (S.djRefus) S.djRefus[v] = 0; sauveB(); note('Donjon ' + nomDj(v) + ' : pause levée à la main'); b.textContent = 'Pause levée ✓'; b.disabled = true; }; ctx.append(b); } }
       else if (CFG.mode === 'quetes') { blocReg(ctx, 'Quêtes', [['villagesPrio', 'Villages prioritaires'], ['quotidiennes', 'Missions quotidiennes (réputation)']]); ctx.append(el('div', 'sec', 'Quêtes en cours')); quetes = corpsQuetes(); ctx.append(quetes.el); quetes.maj(); }
+      if (estDrarito()) blocReg(ctx, 'Pays de l’Eau (Aokiri)', [['aokiri', 'Option Aokiri']], 'Oui : coffres mystérieux du Pays de l’Eau dès qu’un est permis (un par heure), sinon les quêtes du Pays de l’Eau, sinon farm des groupes de monstres. Laissez le mode sur Quêtes. Non : quêtes sur tout le continent.'); // V14.58 — l'option était cachée
       blocReg(ctx, 'En chemin', [['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
       { // V14.0 — énigmes des marchands ambulants
         const E = B.enig || { r: {}, faits: {}, ko: {} }, ks = Object.keys(E.r || {}).filter((k) => enigActive(E.r[k]) || (E.faits[E.r[k].place] && Date.now() - E.faits[E.r[k].place] < 2 * 3600000)).sort((a, b) => E.r[b].vu - E.r[a].vu).slice(0, 6);
