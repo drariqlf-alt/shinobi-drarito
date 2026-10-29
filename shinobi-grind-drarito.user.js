@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.58.0
+// @version     14.59.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.58-Drarito';
+  const VERSION = 'V14.59-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -7615,7 +7615,7 @@
     return navigue(but);
   }
   async function allerEvent() {
-    if (!S.evVise && (Number(CFG.evAller) || CFG.mode === 'tresor')) { // V14.28 — le plus proche d'abord : mon continent avant les autres, puis la distance
+    if (!S.evVise && (Number(CFG.evAller) || CFG.mode === 'tresor' || aokiriOn())) { // V14.28 — le plus proche d'abord : mon continent avant les autres, puis la distance
       const pause = Date.now() < (B.coffreDispoA || 0);
       const ok = (S.evListe || []).filter((x) => x.fin > Date.now() && !(S.evFaits || {})[x.id] && !(x.ko > Date.now()) && !(pause && /:coffre:/.test(String(x.id))) && !evTropLoin(x));
       const cout = (x) => (!x.w || x.w === S.mapId) && S.pos ? dist(x, S.pos) : 1e7 + (x.w || '').length;
@@ -7670,7 +7670,7 @@
   async function enigme() {
     if (S.combat || !enMonde() || CFG.mode === 'brisage' || Date.now() < (S.enigPause || 0)) return false;
     // V14.30 — les coffres passent avant les énigmes : avant, les deux se disputaient le GPS et le trajet faisait des allers-retours
-    if (Number(CFG.evAller) && (/:coffre:/.test(String(S.evVise || '')) || (Date.now() >= (B.coffreDispoA || 0) && coffresDispo().some((x) => !(x.ko > Date.now()))))) return false;
+    if ((Number(CFG.evAller) || aokiriOn()) && (/:coffre:/.test(String(S.evVise || '')) || (Date.now() >= (B.coffreDispoA || 0) && coffresDispo().some((x) => !(x.ko > Date.now()))))) return false;
     const E = B.enig = B.enig || { r: {}, faits: {}, ko: {} };
     if (estDrarito() && !Number(CFG.enigmes)) { if (S.enigEnCours || S.enigVise) { S.enigEnCours = null; S.enigVise = null; gpsArret(); note('Énigme laissée de côté (énigmes coupées dans Réglages) : je reste sur les quêtes et les monstres à ma mesure'); } return false; } // Drarito — sous le niveau 15 : pas de traversée de la carte pour une énigme, quêtes et monstres à ma mesure d'abord
     const id = S.enigVise || (Number(CFG.enigmes) ? prochaineEnigme() : null);
@@ -7752,8 +7752,8 @@
     const ouW = (String(d.id || '').match(/^(world-[a-z0-9-]+):/) || [])[1] || null;
     const allable = typeof d.x === 'number' && typeof d.y === 'number' && d.x > 0 && d.y > 0 && !/^(dec|enig):/.test(String(d.id || '')) && !/fini|ended|done|over/i.test(String(d.state || ''))
       && /coffre|chest|myst[eè]re/i.test(String(d.kind || '') + ' ' + String(d.name || '') + ' ' + String(d.title || '')) && !/^(pnj|world\.|énigme|découverte|map\.|zone\.)/i.test(String(d.kind || '')); // V14.3 — jamais vers un PNJ inconnu (positions de zone, pas du monde)
-    if (allable) { S.evListe = (S.evListe || []).filter((e) => e.id !== id).concat([{ id, x: d.x, y: d.y, w: ouW, nom, zone, fin: typeof d.endsAt === 'number' ? d.endsAt : Date.now() + 1800000, marchand: /marchand/i.test(String(d.kind || '')), zoneId: d.zoneId || null }]).slice(-10); if (Number(CFG.evAller) && !evTropLoin(S.evListe[S.evListe.length - 1])) S.evVise = id; }
-    note('ÉVÉNEMENT : ' + txt + (allable ? (Number(CFG.evAller) ? (/:coffre:/.test(id) && Date.now() < (B.coffreDispoA || 0) ? ' — j’irai après ' + new Date(B.coffreDispoA).toTimeString().slice(0, 5) + ' (un coffre par heure)' : /:coffre:/.test(id) && loinDrarito && S.evVise !== id ? ' — trop loin pour l’instant, je reste sur mes quêtes' : /:coffre:/.test(id) && Number(CFG.coffreOuvre) === 1 ? ' — j’y vais et je l’ouvre' : ' — je vous y emmène (je ne ramasse rien)') : ' — touchez le bandeau « M’y emmener »') : ' — pas de position connue, je n’y vais pas')); retiens('événement ' + (d.kind || ''), JSON.stringify(d).slice(0, 800));
+    if (allable) { S.evListe = (S.evListe || []).filter((e) => e.id !== id).concat([{ id, x: d.x, y: d.y, w: ouW, nom, zone, fin: typeof d.endsAt === 'number' ? d.endsAt : Date.now() + 1800000, marchand: /marchand/i.test(String(d.kind || '')), zoneId: d.zoneId || null }]).slice(-60); if ((Number(CFG.evAller) || aokiriOn()) && !evTropLoin(S.evListe[S.evListe.length - 1])) S.evVise = id; } // V14.59 — 60 événements retenus (avant : 10, les coffres du Pays de l'Eau annoncés à la connexion étaient oubliés)
+    note('ÉVÉNEMENT : ' + txt + (allable ? ((Number(CFG.evAller) || aokiriOn()) ? (/:coffre:/.test(id) && Date.now() < (B.coffreDispoA || 0) ? ' — j’irai après ' + new Date(B.coffreDispoA).toTimeString().slice(0, 5) + ' (un coffre par heure)' : /:coffre:/.test(id) && loinDrarito && S.evVise !== id ? ' — trop loin pour l’instant, je reste sur mes quêtes' : /:coffre:/.test(id) && Number(CFG.coffreOuvre) === 1 ? ' — j’y vais et je l’ouvre' : ' — je vous y emmène (je ne ramasse rien)') : ' — touchez le bandeau « M’y emmener »') : ' — pas de position connue, je n’y vais pas')); retiens('événement ' + (d.kind || ''), JSON.stringify(d).slice(0, 800));
     try { tgAlerte(txt); } catch (e) {}
     try { const A = window.AudioContext || window.webkitAudioContext; if (A) { const ac = new A(); [0, 0.25, 0.5].forEach((t) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(ac.destination); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.15); }); setTimeout(() => { try { ac.close(); } catch (e) {} }, 1500); } } catch (e) {}
     try {
@@ -8277,7 +8277,7 @@
     b.style.cssText = 'pointer-events:auto;padding:6px 10px;border-radius:12px;background:' + (rare ? 'rgba(120,70,10,.92)' : 'rgba(20,30,20,.85)') + ';border:1px solid ' + (rare ? '#ffd166' : 'rgba(69,212,131,.5)') + ';color:#f3efe2;line-height:1.3;cursor:pointer';
     b.onclick = () => b.remove(); z.appendChild(b); setTimeout(() => b.remove(), rare ? 600000 : 60000);
   }
-  const coffreHoraire = () => Number(CFG.coffreHoraire) === 1 && /^(farm|xp|ryo|test|quetes)$/.test(String(CFG.mode)) && Number(CFG.evAller) === 1;
+  const coffreHoraire = () => (Number(CFG.coffreHoraire) === 1 && /^(farm|xp|ryo|test|quetes)$/.test(String(CFG.mode)) && Number(CFG.evAller) === 1) || aokiriOn(); // V14.59 — option Aokiri : coffres toujours, même si « M'emmener aux événements » est coupé
   function sceauProche() { // le sceau découvert le plus proche de l'endroit où je suis (en zones à traverser)
     if (estDrarito() && S.pos) { // Drarito — le plus proche en vraie distance (les zones reliées par bateau trompaient le calcul)
       let m = null; (S.sceaux || []).forEach((x) => { if (!x.discovered || x.cost == null || (S.ryo != null && x.cost > S.ryo)) return; const l = lieuSceau(x); if (!l) return; const d = dist(l, S.pos); if (!m || d < m.d) m = { d, x }; });
