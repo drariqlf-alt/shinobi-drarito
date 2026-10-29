@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.53.0
+// @version     14.54.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.53-Drarito';
+  const VERSION = 'V14.54-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1307,7 +1307,7 @@
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
       }
-      if (estDrarito() && CFG.drV10 !== 1) { CFG.drV10 = 1; CFG.journalFichier = 1; sauve(); note('Drarito : journal enregistré dans Téléchargements toutes les 6 h (Réglages → Journal dans un fichier).'); }
+      if (estDrarito() && CFG.drV10 !== 1) { CFG.drV10 = 1; CFG.journalFichier = 1; sauve(); note('Drarito : journal enregistré dans Téléchargements toutes les 10 min (Réglages → Journal dans un fichier).'); }
       if (estDrarito() && CFG.drV9 !== 1) { // Drarito — grille agrandie + carte de l'ami
         CFG.drV9 = 1; sauve(); const nA = fusionneCarteAmi(); B.tourKO = {}; S.tourFiniDit = false; NAV.memo.clear();
         note('Drarito : carte de navigation agrandie à tout le continent (avant, aucun chemin n’était calculé au-delà de 32 768 px, d’où les blocages) · carte de l’ami fusionnée (' + nA + ' éléments : PNJ, sceaux, marchands).');
@@ -8517,7 +8517,7 @@
       ['biju', 'Aller aux antres de bijū ouverts', OUI],
       ['sceauxDecouvre', 'Aller découvrir les sceaux manquants', OUI],
       ['tournee', 'Tournée des sceaux : découvrir tous les sceaux atteignables, puis les quêtes', OUI],
-      ['journalFichier', 'Journal dans un fichier (Téléchargements, toutes les 6 h) pour la vérification automatique', OUI],
+      ['journalFichier', 'Journal dans un fichier (Téléchargements, toutes les 10 min) pour la vérification automatique', OUI],
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
       ['evAller', 'M’emmener aux événements signalés (caravane, objet ou technique au sol) — sans rien ramasser', OUI],
       ['brisInutile', 'Briser tout l’équipement inutile à Ciel (garde les 2 meilleurs jets des pièces utiles)', OUI],
@@ -8825,20 +8825,46 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = 'equipement-shinobi-' + new Date().toISOString().slice(0, 10) + '.txt'; document.body.appendChild(a); a.click(); a.remove();
     return objets.length + panos.length + runes.length;
   }
-  // V14.53 — Drarito : le journal complet est enregistré dans Téléchargements toutes les 6 h (shinobi-journal-drarito.txt),
+  // V14.54 — Drarito : le journal complet est enregistré dans Téléchargements toutes les 10 min (shinobi-journal-drarito.txt),
   // pour que la vérification quotidienne de Claude puisse le lire et corriger le script sans que vous ayez à le copier.
   setInterval(() => {
     try {
       if (!estDrarito() || !Number(CFG.journalFichier) || !S.on) return;
       const now = Date.now(), der = Number(localStorage.getItem('__sg_jfT') || 0);
-      if (now - der < 6 * 3600000 || (S.debut && now - S.debut < 30 * 60000)) return;
+      if (now - der < 10 * 60000 || (S.debut && now - S.debut < 10 * 60000)) return;
       localStorage.setItem('__sg_jfT', String(now));
       const url = URL.createObjectURL(new Blob([texteJournal()], { type: 'text/plain' }));
       const a = document.createElement('a'); a.href = url; a.download = 'shinobi-journal-drarito.txt'; a.style.display = 'none';
       document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 5000);
-      note('Journal enregistré dans Téléchargements (shinobi-journal-drarito.txt) pour la vérification automatique');
+      if (!S.vus.has('jfDit')) { S.vus.add('jfDit'); note('Journal enregistré dans Téléchargements toutes les 10 min (shinobi-journal-drarito.txt) pour la vérification automatique'); }
     } catch (e) {}
   }, 60000);
+  // V14.54 — Drarito : nouvelle version publiée sur GitHub → la page du jeu est rechargée pour qu'elle soit vraiment active.
+  // Tampermonkey vérifie les mises à jour toutes les heures : je laisse passer 65 min après avoir vu la nouvelle version, puis je recharge
+  // hors combat. Si après le rechargement l'ancienne version tourne encore, je réessaie une heure plus tard (3 fois au plus par version).
+  const MAJ_URL = 'https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js';
+  const versionNum = (t) => String(t || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const plusRecente = (a, b) => { const x = versionNum(a), y = versionNum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
+  const maVersion = () => (String(VERSION).match(/V([\d.]+)/) || [])[1] || '0';
+  async function verifieMaj() {
+    try {
+      if (!estDrarito() || !/^\/game/.test(location.pathname)) return;
+      const now = Date.now();
+      if (now - Number(localStorage.getItem('__sg_majT') || 0) < 10 * 60000) return;
+      localStorage.setItem('__sg_majT', String(now));
+      const r = await (FETCH0 || window.fetch).call(window, MAJ_URL + '?t=' + Math.floor(now / 600000), { headers: { Range: 'bytes=0-700' }, cache: 'no-store' });
+      const t = await r.text(), v = (t.match(/@version\s+([\d.]+)/) || [])[1];
+      if (!v) return;
+      let M = {}; try { M = JSON.parse(localStorage.getItem('__sg_maj') || '{}') || {}; } catch (e) {}
+      if (!plusRecente(v, maVersion())) { if (M.v) localStorage.removeItem('__sg_maj'); return; }
+      if (M.v !== v) { M = { v, t: now, n: 0 }; localStorage.setItem('__sg_maj', JSON.stringify(M)); note('Mise à jour : la version ' + v + ' est publiée (je tourne en ' + maVersion() + '). Je rechargerai la page dans environ une heure, quand Tampermonkey l’aura installée.'); return; }
+      if (M.n >= 3 || now - M.t < 65 * 60000 || S.combat) return;
+      M.n++; M.t = now; localStorage.setItem('__sg_maj', JSON.stringify(M));
+      note('Mise à jour : je recharge la page pour activer la version ' + v + ' (essai ' + M.n + '/3)');
+      memoriseOn(); sauveB(); setTimeout(() => location.reload(), 1500);
+    } catch (e) {}
+  }
+  setInterval(() => { verifieMaj(); }, 60000);
   function texteJournal() {
     const sac = S.inv.filter((x) => x && x.itemId);
     return 'BOT ' + VERSION + ' · ' + bilan() + '\n' + 'TELEGRAM : ' + (TG.token ? TG.etat + (TG.off ? ' · coupé (/off)' : '') + ' · ' + TG.file.length + ' message(s) en attente' : 'non réglé sur cet appareil / ce navigateur') + '\n' + memUtilisee() + '\n' + vitesseTxt() + '\n\n' + ((B.rapports || []).length ? 'RAPPORTS DE COMBAT (boss, groupe, combats longs — du plus ancien au plus récent)\n' + B.rapports.join('\n\n') + '\n\n' : '') + donjonsTxt() + '\n\nBRISAGE\n' + txtBris() + '\n\nCLEFS DE DONJON (qui les lâche)\n' + txtCles() + '\n\nINVENTAIRE ' + sac.length + '/' + (S.invCap || 60) + ' : ' + sac.map((x) => x.itemId + (x.quantity > 1 ? ' x' + x.quantity : '')).join(', ') + '\nÉQUIPÉ : ' + Object.keys(S.equip || {}).filter((k) => S.equip[k]).map((k) => k + '=' + S.equip[k]).join(', ') + '\nVERROUILLÉ (jamais remplacé) : ' + (Object.keys(EMPLACEMENTS).filter((k) => raisonVerrou((S.equip || {})[k], k)).map((k) => k + ' (' + raisonVerrou((S.equip || {})[k], k) + ')').join(', ') || 'rien') + ' · PA ' + mesPA() + '\n\n' + etatQuetes() + (CFG.mode !== 'boss' ? '' : '\n\nBOSS (visé : ' + (CFG.boss === 'tous' ? 'tous' : (CAT[CFG.boss] || {}).nom || CFG.boss) + ')\n' + (listeBoss().map((b) => b.nom + ' niv.' + b.niv + ' · réapparition ' + (b.rs ? dureeTxt(b.rs) : '?') + ' · ' + b.etat.txt + ' · ' + (b.lieu ? Math.round(b.lieu.x) + ',' + Math.round(b.lieu.y) + (b.lieu.approx ? ' (à peu près)' : '') : 'emplacement inconnu')).join('\n') || 'catalogue pas encore lu')) + '\n\nDÉGÂTS MESURÉS PAR SORT (moyenne par lancer · par PA · nombre de mesures) : ' + (() => { try { return [...new Set((S.bar || []).concat(Object.keys(B.degSort || {}).filter((id) => S.techniques.has(id))))].map((id) => { const o = (B.degSort || {})[id], t = S.techniques.get(id); if (!o || !o.n) return id.split('.').pop() + ' : pas encore mesuré'; return id.split('.').pop() + ' ' + Math.round(o.v || 0) + (t && t.apCost ? ' (' + Math.round((o.v || 0) / t.apCost) + '/PA)' : '') + ' ×' + o.n + ((S.bar || []).indexOf(id) >= 0 ? '' : ' · hors barre'); }).join(' | '); } catch (e) { return '?'; } })() + '\n\nVOL DE VIE MESURÉ : ' + (Object.keys(B.degSort || {}).filter((k) => B.degSort[k].ns > 0).map((k) => k + ' +' + Math.round(B.degSort[k].soin) + ' PV').join(', ') || 'aucun pour l’instant') + (S.v5 ? '\n\nCARACTÉRISTIQUES V5 : ' + Object.keys(S.carac || {}).map((k) => k + ' ' + S.carac[k]).join(', ') + ' · points libres ' + (S.points || 0) + (S.herSkills ? ' · héritage : ' + S.herSkills.join(', ') : '') : '') + '\n\nCOMBAT 4.0 — FICHE BRUTE DU PERSONNAGE\n' + (S.persoBrut || '(pas encore reçue)').slice(0, 1600) + '\n\nTECHNIQUES (fiches complètes)\n' + ([...S.techniques.values()].map((t) => JSON.stringify(t).slice(0, 700)).join('\n') || '(aucune reçue)') + '\n\nEXPLORATION : ' + Object.keys(B.pass || {}).length + ' passages appris · ' + Object.keys(B.zoneOrg || {}).filter((z) => (B.zoneOrg[z] || {}).s).length + ' zones situées avec certitude' + '\n\nROUTES FLUIDES : ' + PAS.n + ' cases parcourues sans heurt · obstacles retenus : ' + FIXES.size + ' · indécisions : ' + (S.nbIndecis || 0) + ' · vitesse de marche mesurée : ' + Math.round(S.vitesse || 0) + ' px/s' + '\n\nDERNIERS COMBATS (40) :\n' + ((B.classes || []).map((x) => new Date(x.t).toTimeString().slice(0, 5) + ' ' + (x.g ? 'victoire' : 'défaite') + ' · ' + x.nb + ' ennemis niv. ' + x.niv.join('/') + ' (' + x.rang + ') · moi niv.' + x.moi + ' · ' + x.pv + ' % de vie perdue au plus bas · ' + x.type).join('\n') || 'aucun encore') + '\n\nRYŌS : ' + court(S.ryoCombat || 0) + ' gagnés en combat cette session · par ennemi tué : ' + (Object.keys(B.especes).filter((k) => B.especes[k].ryo > 0).sort((a, b) => B.especes[b].ryo - B.especes[a].ryo).slice(0, 25).map((k) => (B.especes[k].nom || k) + ' ' + B.especes[k].ryo).join(', ') || 'pas encore mesuré') + '\n\nSOINS CONNUS : ' + (Object.keys(B.soins || {}).map((k) => k + (B.soins[k] ? ' +' + B.soins[k] + ' PV' : ' ne soigne pas')).join(', ') || 'aucun mesuré') + '\n\nINDICATIONS DU JEU : zone lue « ' + (JEU.zone || '?') + ' »' + '\n\nSCEAUX DE TÉLÉPORTATION : ' + ((S.sceaux || []).map((x) => x.id.replace(/^sceau-/, '') + (x.discovered ? ' ✓' + (x.cost != null ? x.cost : '') : ' ✗')).join(', ') || 'liste pas encore reçue') + '\n\nNOUVEAUTÉS DU JEU (événements, PNJ inconnus, techniques au sol — données brutes)\n' + ((B.decouv || []).map((x) => new Date(x.t).toTimeString().slice(0, 5) + ' ' + x.titre + ' · ' + x.carte + ' · moi ' + x.pos + '\n   ' + x.j).join('\n') || '(rien encore)') + '\n\nDÉCOUVERTES (donjons, bijū…)\n' + (Object.keys(B.dec || {}).sort((a, b) => B.dec[a].t - B.dec[b].t).map((k) => new Date(B.dec[k].t).toTimeString().slice(0, 5) + ' ' + k + ' : ' + B.dec[k].x).join('\n') || '(rien encore)') + '\n\n' + bestiaire() + '\n\nJOURNAL\n' + S.journal.join('\n');
