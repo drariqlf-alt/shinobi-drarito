@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.63.0
+// @version     14.63.1
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.63-Drarito';
+  const VERSION = 'V14.63.1-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2144,9 +2144,12 @@
       const now = Date.now(), z = litIndications().zone; if (!z) return;
       const saut = VIL.der && dist(VIL.der, S.pos) > 700; // téléportation ou sceau : pas une porte
       B.villages = B.villages || {};
-      if (VIL.z && estVillage(VIL.z) && z !== VIL.z && VIL.der && !saut && now - VIL.t < 6000) {
+      if (saut || S.tpA > now - 8000) { VIL.z = null; VIL.der = { x: S.pos.x, y: S.pos.y }; VIL.t = now; VIL.calme = now + 6000; return; } // V14.63.1 — après une téléportation, le nom de zone affiché met quelques secondes à changer : j'attends
+      if (VIL.calme && now < VIL.calme) { VIL.der = { x: S.pos.x, y: S.pos.y }; VIL.t = now; return; }
+      if (VIL.z && estVillage(VIL.z) && z !== VIL.z && VIL.der && now - VIL.t < 6000) {
         const V = B.villages[VIL.z] = B.villages[VIL.z] || { sx: 0, sy: 0, n: 0, r: 0, sorties: [] };
-        if (!V.sorties.some((p) => dist(p, VIL.der) < 250)) { V.sorties.push({ x: Math.round(VIL.der.x), y: Math.round(VIL.der.y), vers: z }); V.sorties = V.sorties.slice(-10); sauveB(); note('Village : porte de ' + VIL.z + ' retenue en ' + Math.round(VIL.der.x) + ',' + Math.round(VIL.der.y) + ' (vers ' + z + ')'); }
+        const c0 = V.n ? { x: V.sx / V.n, y: V.sy / V.n } : null;
+        if (c0 && V.n >= 12 && dist(VIL.der, c0) < Math.max(600, V.r) + 400 && !V.sorties.some((p) => dist(p, VIL.der) < 250)) { /* une porte est au bord du village, jamais loin de lui */ V.sorties.push({ x: Math.round(VIL.der.x), y: Math.round(VIL.der.y), vers: z }); V.sorties = V.sorties.slice(-10); sauveB(); note('Village : porte de ' + VIL.z + ' retenue en ' + Math.round(VIL.der.x) + ',' + Math.round(VIL.der.y) + ' (vers ' + z + ')'); }
       }
       if (estVillage(z) && !saut) {
         const V = B.villages[z] = B.villages[z] || { sx: 0, sy: 0, n: 0, r: 0, sorties: [] };
@@ -2167,6 +2170,7 @@
         const moiDedans = z === k, butDedans = dist(but, c) < R;
         if (moiDedans === butDedans) return; // même côté de la muraille : pas besoin de porte
         if (!moiDedans && dist(S.pos, c) > R + 2500) return; // village loin de moi : pas concerné
+        V.sorties = (V.sorties || []).filter((p) => dist(p, c) < R + 600); // portes aberrantes (relevées pendant une téléportation) oubliées
         V.sorties.forEach((p) => { if (dist(S.pos, p) < 90) return; const cout = dist(S.pos, p) + dist(p, but); if (!best || cout < best.cout) best = { x: p.x, y: p.y, cout }; });
       });
       return best;
