@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.61.0
+// @version     14.63.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.61-Drarito';
+  const VERSION = 'V14.63-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2131,7 +2131,47 @@
     PAS.sales.clear();
     try { localStorage.setItem('__sg_pas', JSON.stringify(PAS.blocs)); } catch (e) {}
   }
-  const pasHeurt = () => { PAS.tampon = []; }; // un heurt : le bout de chemin en cours n'était pas fluide, on ne le garde pas
+  const pasHeurt = () => { PAS.tampon = []; };
+  // V14.62 — Drarito : sorties des villages apprises en marchant (par le bot ou par vous). Quand je passe d'un village à une autre zone
+  // sans téléportation, l'endroit où j'étais encore dans le village est retenu comme porte. Pour sortir d'un village (ou y entrer),
+  // je passe d'abord par la porte la mieux placée au lieu de longer les murailles.
+  const estVillage = (z) => /village|^ville-|amegakure/.test(String(z || ''));
+  const VIL = { z: null, der: null, t: 0, dit: {}, noms: 0 };
+  setInterval(() => {
+    try {
+      if (!S.self || !S.pos || !enMonde() || !estDrarito()) return;
+      if (!VIL.noms || Date.now() - VIL.noms > 60000) { VIL.noms = Date.now(); apprendNomsZones(); }
+      const now = Date.now(), z = litIndications().zone; if (!z) return;
+      const saut = VIL.der && dist(VIL.der, S.pos) > 700; // téléportation ou sceau : pas une porte
+      B.villages = B.villages || {};
+      if (VIL.z && estVillage(VIL.z) && z !== VIL.z && VIL.der && !saut && now - VIL.t < 6000) {
+        const V = B.villages[VIL.z] = B.villages[VIL.z] || { sx: 0, sy: 0, n: 0, r: 0, sorties: [] };
+        if (!V.sorties.some((p) => dist(p, VIL.der) < 250)) { V.sorties.push({ x: Math.round(VIL.der.x), y: Math.round(VIL.der.y), vers: z }); V.sorties = V.sorties.slice(-10); sauveB(); note('Village : porte de ' + VIL.z + ' retenue en ' + Math.round(VIL.der.x) + ',' + Math.round(VIL.der.y) + ' (vers ' + z + ')'); }
+      }
+      if (estVillage(z) && !saut) {
+        const V = B.villages[z] = B.villages[z] || { sx: 0, sy: 0, n: 0, r: 0, sorties: [] };
+        if (V.n >= 400) { V.sx *= 0.9; V.sy *= 0.9; V.n *= 0.9; }
+        V.sx += S.pos.x; V.sy += S.pos.y; V.n++; const c = { x: V.sx / V.n, y: V.sy / V.n }; V.r = Math.max(V.r * 0.999, dist(c, S.pos));
+      }
+      VIL.z = z; VIL.der = { x: S.pos.x, y: S.pos.y }; VIL.t = now;
+    } catch (e) {}
+  }, 1500);
+  function porteVillage(but) { // la porte par laquelle passer, ou null
+    try {
+      if (!estDrarito() || !S.pos || !but || !B.villages) return null;
+      const z = JEU.zone; if (!z) return null; // zone inconnue : je ne devine pas de quel côté de la muraille je suis
+      let best = null;
+      Object.keys(B.villages).forEach((k) => {
+        const V = B.villages[k]; if (!V || !V.n || !(V.sorties || []).length) return;
+        const c = { x: V.sx / V.n, y: V.sy / V.n }, R = Math.max(600, V.r || 0);
+        const moiDedans = z === k, butDedans = dist(but, c) < R;
+        if (moiDedans === butDedans) return; // même côté de la muraille : pas besoin de porte
+        if (!moiDedans && dist(S.pos, c) > R + 2500) return; // village loin de moi : pas concerné
+        V.sorties.forEach((p) => { if (dist(S.pos, p) < 90) return; const cout = dist(S.pos, p) + dist(p, but); if (!best || cout < best.cout) best = { x: p.x, y: p.y, cout }; });
+      });
+      return best;
+    } catch (e) { return null; }
+  } // un heurt : le bout de chemin en cours n'était pas fluide, on ne le garde pas
   setInterval(() => {
     try {
       const now = Date.now();
@@ -2369,6 +2409,9 @@
   const simple = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const ZONE_PAR_NOM = {};
   Object.keys(NOMS).forEach((z) => { ZONE_PAR_NOM[simple(NOMS[z])] = z; });
+  // V14.62 — noms actuels des villages (le jeu les a renommés : Honoha, Aokiri, Kuma, Tsuna, Shiwa) ; les autres sont appris des sceaux et des événements
+  [['Village de Honoha', 'konoha-village'], ['Village d’Aokiri', 'village-de-kiri'], ['Village de Kuma', 'village-de-kumo'], ['Village de Tsuna', 'village-de-suna'], ['Village de Shiwa', 'village-d-iwa'], ['Ville de Tanzaku', 'ville-de-tanzaku'], ['Amegakure', 'amegakure']].forEach(([n, z]) => { ZONE_PAR_NOM[simple(n)] = z; });
+  function apprendNomsZones() { try { (S.sceaux || []).forEach((x) => { if (x && x.zoneName && x.mapId) ZONE_PAR_NOM[simple(x.zoneName)] = x.mapId; }); (S.evListe || []).forEach((e) => { if (e && e.zone && e.zoneId && /[A-ZÀ-Ü ]/.test(String(e.zone))) ZONE_PAR_NOM[simple(e.zone)] = e.zoneId; }); } catch (e) {} }
   const JEU = { t: 0, zone: null, sorties: {}, brut: '' };
   // Le jeu écrit en clair la zone où je suis (en haut à gauche) et, sous chaque quête suivie, « ➜ Zone visée · sortie « Zone voisine » ».
   function litIndications() {
@@ -2379,6 +2422,11 @@
     const lignes = txt.split('\n').map((l) => l.trim()).filter(Boolean);
     JEU.zone = null; JEU.sorties = {}; JEU.brut = '';
     const actives = S.q.liste.filter((q) => q.status === 'active').map((q) => ({ id: q.questId, nom: simple((S.q.defs.get(q.questId) || {}).name) })).filter((q) => q.nom);
+    for (let i = 0; i < lignes.length && !JEU.zone; i++) { // V14.62 — mini-carte : « Village d’Aokiri » puis l'heure (« 23:08 ») ou « Niv. 1–70 »
+      const l = lignes[i]; if (l.length > 40) continue;
+      const z = ZONE_PAR_NOM[simple(l)]; if (!z) continue;
+      if (lignes.slice(i + 1, i + 4).some((x) => /^\d{1,2}:\d{2}$|^Niv\.?\s*\d/.test(x))) JEU.zone = z;
+    }
     for (let i = 0; i < lignes.length; i++) {
       const l = lignes[i];
       if (!JEU.zone) { const mz = /^(.{3,40}?)\s*#\d+/.exec(l) || (/^#\d+/.test(lignes[i + 1] || '') ? [0, l] : null); const z = mz && ZONE_PAR_NOM[simple(mz[1])]; if (z) JEU.zone = z; }
@@ -2470,6 +2518,7 @@
   }
   function navigue(but0) {
     if (but0 && typeof but0.x === 'number') S.navBut = { x: but0.x, y: but0.y, t: Date.now() }; // Drarito — le but final, retenu pour le déblocage
+    { const pv = but0 && typeof but0.x === 'number' && porteVillage(but0); if (pv) { if (S.porteDite !== pv.x + ',' + pv.y) { S.porteDite = pv.x + ',' + pv.y; note('Village : je passe par la porte ' + Math.round(pv.x) + ',' + Math.round(pv.y)); } but0 = Object.assign({}, but0, { x: pv.x, y: pv.y }); } } // V14.62 — par la porte du village
     rafraichit();
     const maintenant = Date.now();
     if (NAV.parFleche && maintenant - NAV.parFleche.t < 12000 && dist(NAV.parFleche.but, but0) < 250) { // je contourne en suivant la flèche du jeu
@@ -3013,14 +3062,15 @@
     const maintenant = Date.now();
     if (!Number(CFG.sceaux) || !enMonde() || S.combat || maintenant < (S.tpA || 0) || !S.sceaux) return false;
     const d = dist(but, S.pos);
-    if (d < 3500) return false;
+    if (d < (estDrarito() && (bloqueAppris(but) || zoneInterdite(but)) ? 1800 : 3500)) return false;
     B.tpKO = B.tpKO || {};
     const J = litIndications(), ind = NAV.quete && J.sorties[NAV.quete];
     if (ind && ind.vers) zoneBut = ind.vers; // le jeu dit lui-même dans quelle zone se trouve l'objectif
     const ici = J.zone || zoneDe(S.pos), hIci = zoneBut ? sauts(ici, zoneBut) : null;
     if (basNivDrarito()) { // Drarito — seulement un sceau qui me dépose à moins de 8 000 px du but, et plus près que là où je suis ; sinon pas de voyage
       const sp = sceauPourDrarito(but);
-      if (!sp || sp.d > d - 2000 || dist(sp.l, S.pos) < 2500) return false;
+      const bloqueIci = bloqueAppris(but) || zoneInterdite(but); // V14.62 — chemin à pied déjà raté vers ce but : un sceau qui me rapproche, même un peu, vaut mieux que les murailles
+      if (!sp || dist(sp.l, S.pos) < 1200 || !(d - sp.d > (bloqueIci ? 300 : 1500))) return false;
       stop(); S.tpA = maintenant + 60000; statut('Sceau : voyage vers ' + sp.s.name);
       note('Sceau : voyage vers ' + (sp.s.name || sp.s.id) + ' (il me dépose à ' + Math.round(sp.d) + ' px du but au lieu de ' + Math.round(d) + ')');
       envoie('teleport.remote', { destinationId: sp.s.id });
@@ -3219,6 +3269,8 @@
     try { Object.keys(ZONES).forEach((z) => { const o = origineZone(z); if (!o) return; Object.keys(ZONES[z].m).forEach((mk) => { if (mk.slice(z.length + 1).replace(/-\d+$/, '') !== k) return; const q = { x: o.x + ZONES[z].m[mk][0], y: o.y + ZONES[z].m[mk][1] }; if (!mieux || dist(q, S.pos) < dist(mieux, S.pos)) mieux = q; }); }); } catch (e) {}
     return mieux || (B.especes[k] || {}).lieu || null;
   }
+  // V14.62 — Drarito : distance « en temps » : une quête à 30 000 px mais à côté d'un sceau découvert ne coûte qu'une téléportation (≈ 2 500 px de marche).
+  function distEffective(l) { const d = dist(l, S.pos); if (d < 3500) return d; const sp = sceauPourDrarito(l); return sp ? Math.min(d, sp.d + 2500) : d; }
   function distDonneur(id) {
     try {
       const c = DQ.get(id); if (c && Date.now() - c.t < 3000) return c.d;
@@ -3236,7 +3288,7 @@
             else if ((o.kind === 'enter' || o.kind === 'reach') && o.mapId) { const oz = origineZone(o.mapId), Z = ZONES[o.mapId]; if (oz && Z) lieux.push({ x: oz.x + Z.w * 16, y: oz.y + Z.h * 16 }); }
           });
         }
-        lieux.filter((l) => l && typeof l.x === 'number').forEach((l) => { const dd = atteignable(l) ? dist(l, S.pos) : 60000; if (dd < d || d === 15000) d = Math.min(d === 15000 ? Infinity : d, dd); });
+        lieux.filter((l) => l && typeof l.x === 'number').forEach((l) => { const dd = atteignable(l) ? distEffective(l) : 60000; if (dd < d || d === 15000) d = Math.min(d === 15000 ? Infinity : d, dd); });
       }
       DQ.set(id, { t: Date.now(), d }); return d;
     } catch (e) { return 15000; }
