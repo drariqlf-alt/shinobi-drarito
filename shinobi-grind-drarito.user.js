@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.55.0
+// @version     14.57.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.55-Drarito';
+  const VERSION = 'V14.57-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -455,6 +455,12 @@
         for (const t of S.rarTextes) {
           let p = -1, essais = 0;
           while (!trouve && (p = t.indexOf('"' + id + '"', p + 1)) >= 0 && essais++ < 30) {
+            { // V14.57 — dans certains fichiers du jeu, la couleur est écrite AVANT l'identifiant : { rarity: "common", id: "…" }.
+              // Je ne lis que le même objet (rien après la dernière accolade fermante) et seulement une propriété nommée rarity/rarete/quality.
+              let av = t.slice(Math.max(0, p - 500), p); const fin = av.lastIndexOf('}'); if (fin >= 0) av = av.slice(fin + 1);
+              const mk = /\b(?:rarity|rarete|rareté|quality)["']?\s*:\s*["'`](common|uncommon|rare|epic|legendary|commun|peu[- ]commun|[ée]pique|l[ée]gendaire)["'`]/i.exec(av);
+              if (mk) { trouve = { r: RAR_FR[mk[1].toLowerCase()] || mk[1].toLowerCase() }; const st = /\bset["']?\s*:\s*["']([a-z0-9-]+)["']/.exec(av); if (st) trouve.s = st[1]; break; }
+            }
             let fen = t.slice(p + id.length + 2, p + id.length + 2 + 900);
             const coupe = fen.search(/[{,]\s*id\s*:\s*["']|\}\s*,\s*\{|\}\s*\)?\s*,\s*["'][a-z0-9]+-[a-z0-9-]+["']\s*:/); // l'objet suivant commence : je m'arrête là
             if (coupe >= 0) fen = fen.slice(0, coupe);
@@ -475,7 +481,7 @@
         S.vus.add('rarKO');
         const t = (S.rarTextes || []).find((x) => x.indexOf('"' + manque[0] + '"') >= 0), p = t ? t.indexOf('"' + manque[0] + '"') : -1;
         note('Couleurs des objets introuvables dans les fichiers du jeu (' + manque.length + ' objets cherchés) : la vente par couleur reste en attente');
-        retiens('rareté introuvable', p >= 0 ? manque[0] + ' → ' + t.slice(Math.max(0, p - 150), p + 450).replace(/\s+/g, ' ') : 'identifiant ' + manque[0] + ' absent des fichiers lus (' + (S.rarTextes || []).length + ')');
+        retiens('rareté introuvable', p >= 0 ? manque[0] + ' → ' + t.slice(Math.max(0, p - 400), p + 450).replace(/\s+/g, ' ') : 'identifiant ' + manque[0] + ' absent des fichiers lus (' + (S.rarTextes || []).length + ')');
       }
     } catch (e) { note('Couleurs des objets : ' + e.message); } finally { rarEnCours = false; }
   }
@@ -1307,8 +1313,12 @@
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
       }
+      if (estDrarito() && CFG.drV12 !== 1) { // Drarito — option Aokiri : quêtes du Pays de l'Eau entre deux coffres
+        Object.assign(CFG, { drV12: 1, mode: Number(CFG.aokiri) === 1 ? 'quetes' : CFG.mode }); sauve();
+        if (Number(CFG.aokiri) === 1) note('Drarito : option Aokiri — coffres du Pays de l’Eau dès qu’un est permis, sinon les quêtes du Pays de l’Eau, sinon farm des groupes de monstres. Retour aux quêtes dès que le coffre est ouvert.');
+      }
       if (estDrarito() && CFG.drV11 !== 1) { // Drarito — option Aokiri activée à la demande du joueur
-        Object.assign(CFG, { drV11: 1, aokiri: 1, mode: 'xp', meute: 6, coffreHoraire: 1, evAller: 1, coffreOuvre: 1 }); sauve();
+        Object.assign(CFG, { drV11: 1, drV12: 1, aokiri: 1, mode: 'quetes', meute: 6, coffreHoraire: 1, evAller: 1, coffreOuvre: 1 }); sauve();
         note('Drarito : option Aokiri activée — coffres du Pays de l’Eau (un par heure, règle du jeu) et farm des groupes de monstres entre deux coffres. Pour revenir aux quêtes : Réglages → Aokiri (non) et mode Quêtes.');
       }
       if (estDrarito() && CFG.drV10 !== 1) { CFG.drV10 = 1; CFG.journalFichier = 1; sauve(); note('Drarito : journal enregistré dans Téléchargements toutes les 10 min (Réglages → Journal dans un fichier).'); }
@@ -3230,6 +3240,24 @@
       DQ.set(id, { t: Date.now(), d }); return d;
     } catch (e) { return 15000; }
   }
+  // V14.56 — Drarito, option Aokiri : une quête compte si sa prochaine étape se fait au Pays de l'Eau (donneur, PNJ, monstres, lieu),
+  // ou si elle se gagne n'importe où (gagner des combats).
+  function queteDansAokiri(id) {
+    try {
+      const q = S.q.liste.find((x) => x.questId === id), def = S.q.defs.get(id) || {};
+      if (!q) return false;
+      if (q.status === 'available') return dansAokiri(def.giver && lieuPNJ(def.giver));
+      const et = def.steps && def.steps[q.stepIndex];
+      return ((et && et.objectives) || []).filter((o) => ((q.counters || {})[o.id] || 0) < (o.count || 1)).some((o) => {
+        if (o.kind === 'win' || o.kind === 'significantWin') return true;
+        if (o.kind === 'talk') return dansAokiri(lieuPNJ(S.q.cibles[id + ':' + o.id] || (o.npcByVillage && o.npcByVillage[S.village]) || o.npcId));
+        if (o.kind === 'kill' && o.mobId) return dansAokiri(lieuEspeceProche(o.mobId));
+        if (o.kind === 'collect') return true; // tombe sur les monstres de la quête : jugé avec eux
+        if ((o.kind === 'enter' || o.kind === 'reach') && o.mapId) return /kiri|brume|roselieres|sept-epeistes/.test(String(o.mapId));
+        return false;
+      });
+    } catch (e) { return false; }
+  }
   // Drarito — la quête la plus proche d'abord : l'XP compte, mais divisée fortement par la distance (à 4 000 px : ÷4, à 12 000 px : ÷16, hors de portée : presque rien).
   const xpPondere = (id) => { const xp = xpQuete(id); if (!estDrarito()) return xp; const d = distDonneur(id); return xp / Math.pow(1 + d / 4000, 2); };
   const cleQuete = (id) => (ordreQuete(id) + (autreVillage(id) || autreClan(id) ? 4 : 0)) * 1e9 - Math.min(9e8, xpPondere(id));
@@ -3306,6 +3334,7 @@
     liste.forEach((x) => {
       const p = (B.sceauxPos || {})[x.id];
       if (estDrarito() && p && p.carte && !p.ok && !p.tp && !p.vu) return; // Drarito — position « carte » : pas dans le repère du terrain
+      if (aokiriOn() && p && !dansAokiri(p)) return; // Drarito — option Aokiri : sceaux du Pays de l'Eau seulement
       if (!p || typeof p.x !== 'number' || S.pnjIgnore['zone:sceau:' + x.id] > maintenant || ((S.sceauTry || {})[Math.round(p.x / 64) + ',' + Math.round(p.y / 64)] > maintenant)) return;
       const d = dist(p, S.pos);
       if (x.inconnu && d > Math.min(rayon || 1500, 6000)) return; // sans la liste du jeu, je ne fais pas de long détour pour un sceau peut-être déjà à moi
@@ -3595,7 +3624,7 @@
   function objectif() {
     const maintenant = Date.now();
     const ok = (id) => !(S.pnjIgnore[id] > maintenant);
-    const actives = S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant) && !autreClan(q.questId) && queteRentable(q.questId))
+    const actives = S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant) && !autreClan(q.questId) && queteRentable(q.questId) && (!aokiriOn() || queteDansAokiri(q.questId)))
       .sort((a, b) => ((b.questId === CFG.quete) - (a.questId === CFG.quete)) || ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || (Number(CFG.suivie) ? ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)) : 0) || (cleQuete(a.questId) - cleQuete(b.questId)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)));
     // Grade : dès que le niveau est atteint et que le titre manque, on va voir le Kage du village avant tout.
     const KAGE = { kiri: 'npc-village-de-kiri-2' };
@@ -3610,7 +3639,7 @@
     let dispo = null; // la meilleure quête à prendre : d'abord le rang, ensuite la distance
     if (S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant)).length < 6 && S.q.liste.filter((q) => q.status === 'active').length < 14) {
       const offre = (id) => Math.min(9e9, ...[...S.q.defs.values()].filter((d) => d.giver === id && (d.minLevel || 1) <= S.niveau && queteRentable(d.id) && !autreClan(d.id) && S.q.liste.some((q) => q.questId === d.id && q.status === 'available')).map((d) => cleQuete(d.id)));
-      dispo = Object.keys(m).filter((id) => m[id] === 'available' && ok(id)).map((id) => { const k = offre(id); return { npc: id, k, r: Math.ceil(k / 1e9) }; }).filter((x) => x.k < 9e9 && lieuPNJ(x.npc) && !(basNivDrarito() && x.r > 1 && !atteignable(lieuPNJ(x.npc), NPCZ[x.npc]))) // quêtes de clan et de grade : toujours faites, même loin // Drarito — sous le niveau 15 : pas de marche à travers le continent pour prendre une quête, je chasse autour de moi
+      dispo = Object.keys(m).filter((id) => m[id] === 'available' && ok(id)).map((id) => { const k = offre(id); return { npc: id, k, r: Math.ceil(k / 1e9) }; }).filter((x) => x.k < 9e9 && lieuPNJ(x.npc) && !(basNivDrarito() && x.r > 1 && !atteignable(lieuPNJ(x.npc), NPCZ[x.npc])) && (!aokiriOn() || dansAokiri(lieuPNJ(x.npc)))) // quêtes de clan et de grade : toujours faites, même loin (sauf option Aokiri : Pays de l'Eau seulement) // Drarito — sous le niveau 15 : pas de marche à travers le continent pour prendre une quête, je chasse autour de moi
         .sort((a, b) => (a.k - b.k) || (dist(lieuPNJ(a.npc), S.pos) - dist(lieuPNJ(b.npc), S.pos)))[0] || null;
     }
     // Aucun ennemi voulu en vue : on retourne là où on en a déjà combattu.
@@ -6061,7 +6090,7 @@
     const marchands = Object.keys(Object.assign({}, B.marchands || {}, B.boutiques || {})).filter((n) => !(S.pnjIgnore[n] > now)).map((n) => ({ n, l: lieuPNJ(n) })).filter((m) => m.l && (!basNivDrarito() || atteignable(m.l, NPCZ[m.n]))).sort((a, b) => dist(a.l, S.pos) - dist(b.l, S.pos)); // Drarito — seulement un marchand que je sais rejoindre
     if (!marchands.length) { S.vcA = now + 1800000; if (!S.vus.has('vcSansMarchand')) { S.vus.add('vcSansMarchand'); note('Vente par couleur : je ne connais aucun marchand. Vendez une fois un objet à la main chez un marchand, je retiendrai lequel.'); } return false; }
     const npc = marchands[0].n;
-    if (dist(marchands[0].l, S.pos) > 90) { statut('Vente par couleur : je vais chez le marchand (' + dansSac.length + ' objets)', true); await parle(npc, 'vendre l’équipement'); return true; }
+    if (dist(marchands[0].l, S.pos) > 90 || (marchands[0].l.porte && dedans() !== marchands[0].l.porte)) { statut('Vente par couleur : je vais chez le marchand (' + dansSac.length + ' objets)', true); await parle(npc, 'vendre l’équipement'); return true; } // V14.57 — marchand dans un bâtiment (Teuchi à Ichiraku) : j'entre d'abord
     stop();
     envoie('npc.talk', { npcId: npc });
     const r = await attend((ev, x) => (ev === 'npc.dialogue' && x.npcId === npc) || (ev === 'server.error' && x.scope === 'npc'), 2500);
@@ -6085,7 +6114,7 @@
       n++;
     }
     envoie('npc.close', { npcId: npc }); S.dialogue = null;
-    if (ko && !n) { S.pnjIgnore[npc] = now + 1800000; S.vcA = now + 300000; note('Vente par couleur : le marchand refuse (' + ko + ')' + (opts.length ? ' · choix proposés : ' + opts.map((o) => o.id).join(', ') : '')); return true; }
+    if (ko && !n) { S.pnjIgnore[npc] = now + 1800000; S.vcA = now + 300000; if (/no_shop/.test(String(ko)) && B.marchands) { delete B.marchands[npc]; sauveB(); } /* V14.57 — pas une boutique : je ne le prends plus pour un marchand */ note('Vente par couleur : le marchand refuse (' + ko + ')' + (opts.length ? ' · choix proposés : ' + opts.map((o) => o.id).join(', ') : '')); return true; }
     B.marchands = B.marchands || {}; B.marchands[npc] = 1; sauveB();
     note('Vente par couleur : ' + n + ' objet' + (n > 1 ? 's' : '') + ' vendu' + (n > 1 ? 's' : '') + ' au marchand' + (typeof ryo0 === 'number' && S.ryo > ryo0 ? ' pour ' + (S.ryo - ryo0) + ' ryōs' : '') + (ko ? ' (arrêt : ' + ko + ')' : ''));
     S.vcA = now + 20000;
@@ -6246,7 +6275,7 @@
     let best = null;
     S.sceaux.filter((x) => !x.discovered).forEach((x) => {
       const l = (B.sceauxPos || {})[x.id]; // place relevée sur le terrain seulement : la place « carte » (repère de l'image du monde) et les estimations l'envoyaient au mauvais endroit
-      if (!l || (l.carte && !l.ok && !l.tp && !l.vu) || typeof l.x !== 'number' || B.tourKO[x.id] > now || zoneTropHaute(l)) return;
+      if (!l || (l.carte && !l.ok && !l.tp && !l.vu) || typeof l.x !== 'number' || B.tourKO[x.id] > now || zoneTropHaute(l) || (aokiriOn() && !dansAokiri(l))) return;
       let d = bloqueAppris(l) ? Infinity : dist(l, S.pos), dep = null;
       departs.forEach((p) => { const dd = dist(p.l, l); if (dd + 1500 < d && !bloqueDepuis(p.l, l)) { d = dd; dep = p; } });
       if (d > 15000) return;
@@ -7060,7 +7089,11 @@
         const ici = dedans();
         if (!ici && await tourneeSceaux()) return; // Drarito — tournée des sceaux d'abord, puis les quêtes
         let o = (!ici && (cibleBiju() || cibleDonjon() || cibleSceau(estDrarito() ? 3500 : 1500))) || (enMonde() || ici ? objectif() : null); // Drarito — un sceau à moins de 3 500 px (une vingtaine de secondes) : je fais le détour et je le mémorise
-        if (!ici && (!o || (o.type === 'attente' && !o.surPlace))) o = cibleSceau(basNivDrarito() ? 6000 : 60000) || o; // plus de quête faisable : les sceaux manquants d'abord, où qu'ils soient, avant de chasser (Drarito sous le niveau 15 : seulement les sceaux proches, sinon il chasse les monstres à sa mesure)
+        if (!ici && (!o || (o.type === 'attente' && !o.surPlace))) o = cibleSceau(basNivDrarito() ? 6000 : 60000) || o;
+        if (aokiriOn() && o && !ici && enMonde()) { // Drarito — option Aokiri : tout objectif hors du Pays de l'Eau (grade, clan, bijū, donjon…) est laissé de côté, je chasse à la place
+          const lo = typeof o.x === 'number' ? o : (o.npc ? lieuPNJ(o.npc) : null);
+          if (lo && !dansAokiri(lo)) { if (o.npc) S.pnjIgnore[o.npc] = Date.now() + 1200000; if (o.q) S.qPause[o.q] = Date.now() + 1200000; o = null; }
+        } // plus de quête faisable : les sceaux manquants d'abord, où qu'ils soient, avant de chasser (Drarito sous le niveau 15 : seulement les sceaux proches, sinon il chasse les monstres à sa mesure)
         if (Number(CFG.flecheNav) && enMonde() && !ici && (!o || o.type === 'attente') && flecheVue() && !(S.flecheStop > Date.now())) {
           S.flecheDepuis = S.flecheDepuis || Date.now();
           if (Date.now() - S.flecheDepuis > 90000) { S.flecheStop = Date.now() + 120000; S.flecheDepuis = 0; }
@@ -8542,7 +8575,7 @@
       ['biju', 'Aller aux antres de bijū ouverts', OUI],
       ['sceauxDecouvre', 'Aller découvrir les sceaux manquants', OUI],
       ['tournee', 'Tournée des sceaux : découvrir tous les sceaux atteignables, puis les quêtes', OUI],
-      ['aokiri', 'Aokiri : coffres du Pays de l’Eau (un par heure) + farm des groupes de monstres entre deux coffres', OUI],
+      ['aokiri', 'Aokiri : coffres du Pays de l’Eau (un par heure), sinon quêtes du Pays de l’Eau, sinon farm des groupes de monstres', OUI],
       ['journalFichier', 'Journal dans un fichier (Téléchargements, toutes les 10 min) pour la vérification automatique', OUI],
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
       ['evAller', 'M’emmener aux événements signalés (caravane, objet ou technique au sol) — sans rien ramasser', OUI],
