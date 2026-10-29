@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.60.0
+// @version     14.61.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.60-Drarito';
+  const VERSION = 'V14.61-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -6089,7 +6089,7 @@
     }
     if (!dansSac.length) { if (estDrarito() && S.drVente) { S.drVente = 0; note('Vente terminée : plus rien d’inutile à vendre dans le sac'); } S.vcA = now + 300000; S.vcDit = false; return false; }
     S.vcA = 0; // des objets à vendre dans le sac : je continue jusqu'au marchand sans attendre
-    const marchands = Object.keys(Object.assign({}, B.marchands || {}, B.boutiques || {})).filter((n) => !(S.pnjIgnore[n] > now)).map((n) => ({ n, l: lieuPNJ(n) })).filter((m) => m.l && (!basNivDrarito() || atteignable(m.l, NPCZ[m.n]))).sort((a, b) => dist(a.l, S.pos) - dist(b.l, S.pos)); // Drarito — seulement un marchand que je sais rejoindre
+    const marchands = Object.keys(Object.assign({}, B.marchands || {}, B.boutiques || {})).filter((n) => !(S.pnjIgnore[n] > now)).map((n) => ({ n, l: lieuPNJ(n) })).filter((m) => m.l && (!basNivDrarito() || atteignable(m.l, NPCZ[m.n])) && (!aokiriVeut() || dansAokiri(m.l)) && !zoneInterdite(m.l)).sort((a, b) => dist(a.l, S.pos) - dist(b.l, S.pos)); // Drarito — seulement un marchand que je sais rejoindre
     if (!marchands.length) { S.vcA = now + 1800000; if (!S.vus.has('vcSansMarchand')) { S.vus.add('vcSansMarchand'); note('Vente par couleur : je ne connais aucun marchand. Vendez une fois un objet à la main chez un marchand, je retiendrai lequel.'); } return false; }
     const npc = marchands[0].n;
     if (dist(marchands[0].l, S.pos) > 90 || (marchands[0].l.porte && dedans() !== marchands[0].l.porte)) { statut('Vente par couleur : je vais chez le marchand (' + dansSac.length + ' objets)', true); await parle(npc, 'vendre l’équipement'); return true; } // V14.57 — marchand dans un bâtiment (Teuchi à Ichiraku) : j'entre d'abord
@@ -7329,12 +7329,12 @@
           if (!S.vus.has('seul')) { S.vus.add('seul'); note('Alternance : je ne connais qu’un personnage dans ce navigateur. Connectez l’autre une fois à la main, bot allumé.'); }
         }
       }
-      if (Number(CFG.entretien) && Date.now() - PAGE_T > 6 * 3600000 && !S.combat && !occupe && navigator.onLine !== false && !S.entretienEnCours) {
+      if ((Number(CFG.entretien) || estDrarito()) && Date.now() - PAGE_T > (estDrarito() ? 2 : 6) * 3600000 && !S.combat && !occupe && navigator.onLine !== false && !S.entretienEnCours) {
         S.entretienEnCours = true;
         (FETCH0 || window.fetch).call(window, location.origin + '/', { method: 'HEAD', cache: 'no-store' }).then((r) => {
           if (!r || !r.ok || S.combat) { S.entretienEnCours = false; return; }
           v.rechargements = (S.rechargements || 0) + 1; v.t = Date.now(); sessionStorage.setItem('__sg_ses', JSON.stringify(v));
-          try { localStorage.setItem('__sg_diag', 'Rechargement d’entretien après 6 h (compteurs conservés)'); } catch (e) {}
+          try { localStorage.setItem('__sg_diag', 'Rechargement d’entretien (compteurs conservés) : la version installée par Tampermonkey devient active'); } catch (e) {}
           sauveB(); location.reload();
         }).catch(() => { S.entretienEnCours = false; });
       }
@@ -7985,6 +7985,8 @@
         } catch (e) {}
       }
     } else if (VEILLE.n === 2) { // 2. parchemin de rappel : on repart d'un endroit sûr
+      const sp0 = estDrarito() && sceauProche(); // V14.61 — Drarito : le sceau le plus proche d'abord (le parchemin le renvoyait à Kuma, à l'autre bout de la carte)
+      if (sp0 && !S.combat && enMonde() && (S.ryo == null || sp0.cost <= S.ryo)) { stop(); gpsArret(); envoie('teleport.remote', { destinationId: sp0.id }); S.tpA = Date.now() + 60000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : sceau « ' + (sp0.name || sp0.id) + ' » pour sortir de ce coin'; note(quoi + ' (' + pourquoi + ')'); return quoi; }
       const slot = S.inv.find((x) => x && x.itemId === 'parchemin-de-rappel' && x.quantity > 0);
       if (slot && !S.combat && enMonde()) { stop(); envoie('inventory.use', { index: slot.index }); S.rappelA = Date.now() + 90000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : parchemin de rappel'; }
       else {
@@ -8954,7 +8956,7 @@
       localStorage.setItem('__sg_majT', String(now));
       const r = await (FETCH0 || window.fetch).call(window, MAJ_URL + '?t=' + Math.floor(now / 600000), { headers: { Range: 'bytes=0-700' }, cache: 'no-store' });
       const t = await r.text(), v = (t.match(/@version\s+([\d.]+)/) || [])[1];
-      if (!v) return;
+      if (!v) { if (!S.vus.has('majVide')) { S.vus.add('majVide'); note('Mise à jour : réponse de GitHub illisible — je compte sur le rechargement automatique toutes les 2 h'); } return; }
       let M = {}; try { M = JSON.parse(localStorage.getItem('__sg_maj') || '{}') || {}; } catch (e) {}
       if (!plusRecente(v, maVersion())) { if (M.v) localStorage.removeItem('__sg_maj'); return; }
       if (M.v !== v) { M = { v, t: now, n: 0 }; localStorage.setItem('__sg_maj', JSON.stringify(M)); note('Mise à jour : la version ' + v + ' est publiée (je tourne en ' + maVersion() + '). Je rechargerai la page dans environ une heure, quand Tampermonkey l’aura installée.'); return; }
@@ -8962,7 +8964,7 @@
       M.n++; M.t = now; localStorage.setItem('__sg_maj', JSON.stringify(M));
       note('Mise à jour : je recharge la page pour activer la version ' + v + ' (essai ' + M.n + '/3)');
       memoriseOn(); sauveB(); setTimeout(() => location.reload(), 1500);
-    } catch (e) {}
+    } catch (e) { if (!S.vus.has('majKO')) { S.vus.add('majKO'); note('Mise à jour : la page du jeu ne peut pas joindre GitHub (' + String(e && e.message || e).slice(0, 80) + ') — je recharge quand même la page toutes les 2 h pour activer les nouvelles versions'); } }
   }
   setInterval(() => { verifieMaj(); }, 60000);
   function texteJournal() {
