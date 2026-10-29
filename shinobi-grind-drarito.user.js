@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.59.0
+// @version     14.60.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.59-Drarito';
+  const VERSION = 'V14.60-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1798,7 +1798,8 @@
       else if (CFG.mode === 'farm' ? dist(m, S.ancre) > CFG.rayon : dist(m, S.pos) > CFG.dmax) return;
       const noms = (especesDe(m) || []).map((k) => ((B.especes[k] || CAT[k] || {}).nom || '') + ' ' + k).join(' ');
       if (f && (m.id + ' ' + (m.pack || []).join(' ') + ' ' + noms).toLowerCase().indexOf(f) < 0) return;
-      if (aokiriOn() && !dansAokiri(m)) return; // Drarito — option Aokiri : je ne chasse qu'au Pays de l'Eau
+      if (estDrarito() && zoneInterdite(m)) return; // Drarito — coin où je n'arrive pas à aller
+      if (aokiriVeut() && !dansAokiri(m)) return; // Drarito — option Aokiri : au Pays de l'Eau tant qu'un coffre ou une quête m'y attend
       if (basNivDrarito() && (espece ? bloqueAppris(m) : !atteignable(m, String(m.id).split('/')[0]))) return; // Drarito — cible derrière un passage impossible ou hors de portée
       const e = estime(m, S.maxHp);
       if (e) {
@@ -3467,7 +3468,8 @@
       const e = B.especes[k];
       if (!e || !e.lieu || !(e.xp > 0) || !(e.duree > 0) || !(e.n >= 2) || !e.niv || e.niv < S.niveau - 14 || e.niv > S.niveau + 5 || (e.perdu || 0) > 0.5 * mx || (CAT[k] || {}).rang === 'boss' || S.pnjIgnore['zone:esp:' + k] > now) return;
       if ((B.dangers || []).some((d) => d.niv > S.niveau + 5 && Math.abs(d.x - e.lieu.x) < 1500 && Math.abs(d.y - e.lieu.y) < 1500)) return;
-      if (aokiriOn() && !dansAokiri(e.lieu)) return; // Drarito — option Aokiri : coins de chasse du Pays de l'Eau seulement
+      if (estDrarito() && zoneInterdite(e.lieu)) return; // Drarito — coin de chasse où je n'arrive pas à aller
+      if (aokiriVeut() && !dansAokiri(e.lieu)) return; // Drarito — option Aokiri : coins de chasse du Pays de l'Eau tant qu'un coffre ou une quête m'y attend
       if (basNivDrarito() && !atteignable(e.lieu, e.lieu.z)) return; // Drarito — coin de chasse que je ne sais pas rejoindre
       const dM = dist(e.lieu, S.pos), trajet = Number(CFG.sceaux) && dM > 4500 ? 30 + 1800 / (S.vitesse || 150) : dM / (S.vitesse || 150);
       const xpm = 60 * e.xp / (e.duree + 15), sc = e.xp / (e.duree + 15 + trajet / 10);
@@ -6220,10 +6222,33 @@
   const estDrarito = () => !!(S.self && String(S.self.name || '') === 'Drarito');
   // V14.55 — Drarito : option « Aokiri » (Réglages). Je reste au Pays de l'Eau (Aokiri) : j'y ouvre les coffres mystérieux dès que le jeu
   // en permet un (un par heure, règle du jeu), et entre deux coffres je farme les groupes de monstres de la région, en attendant leur retour.
+  // V14.60 — Drarito : une zone où je n'arrive pas à aller est interdite 20 min (cibles, coins de chasse, PNJ dedans) : je ne retourne pas buter dessus.
+  function bloqueZoneDrarito(p, pourquoi) {
+    try {
+      const now = Date.now(); S.zonesKO = (S.zonesKO || []).filter((z) => z.fin > now);
+      S.zonesKO.push({ x: p.x, y: p.y, r: 1500, fin: now + 1200000 }); retiensBarriere(p);
+      stop(); gpsArret(); NAV.route = []; NAV.but = null; NAV.prog = null; NAV.dev = null; S.cibleId = null; S.objTenu = null; S.spotDit = null;
+      if (S.objQ) { S.qPause[S.objQ] = now + 1200000; (S.qRaison = S.qRaison || {})[S.objQ] = 'chemin introuvable'; }
+      note('Bloqué : ' + pourquoi + ' (vers ' + Math.round(p.x) + ',' + Math.round(p.y) + ') — j’interdis ce coin 20 min et je passe à autre chose');
+    } catch (e) {}
+  }
+  const zoneInterdite = (p) => !!(p && typeof p.x === 'number' && (S.zonesKO || []).some((z) => z.fin > Date.now() && dist(z, p) < z.r));
   const aokiriOn = () => estDrarito() && Number(CFG.aokiri) === 1;
   const dansAokiri = (p) => !!(p && typeof p.x === 'number' && p.x >= 72000 && p.x <= 95000 && p.y >= 26000 && p.y <= 52000); // îles du Pays de l'Eau (Port de la Brume, Grève, Roselières, Aokiri, Récifs)
+  // V14.60 — l'option Aokiri ne retient au Pays de l'Eau que quand il y a quelque chose à y faire : un coffre permis (ou bientôt),
+  // ou une quête de la région faisable. Sinon, au niveau 55 les monstres d'Aokiri (niveau 30-35) ne rapportent presque rien :
+  // je vais farmer les groupes à mon niveau là où je sais aller, puis je reviens au prochain coffre.
+  function aokiriVeut() {
+    if (!aokiriOn()) return false;
+    const now = Date.now();
+    if (now + 180000 >= (B.coffreDispoA || 0) && (S.evListe || []).some((x) => /:coffre:/.test(String(x.id)) && x.fin > now && !(S.evFaits || {})[x.id] && !(x.ko > now) && dansAokiri(x))) return true;
+    if (S.aokQ && now - S.aokQ.t < 60000) return S.aokQ.v;
+    const v = (S.q.liste || []).some((q) => (q.status === 'active' || q.status === 'available') && !(S.qPause[q.questId] > now) && !autreClan(q.questId) && ((S.q.defs.get(q.questId) || {}).minLevel || 1) <= (S.niveau || 1) && queteDansAokiri(q.questId) && !queteSeGagnePartout(q.questId));
+    S.aokQ = { t: now, v }; return v;
+  }
+  function queteSeGagnePartout(id) { try { const q = S.q.liste.find((x) => x.questId === id), def = S.q.defs.get(id) || {}; if (!q || q.status !== 'active') return false; const et = def.steps && def.steps[q.stepIndex]; const reste = ((et && et.objectives) || []).filter((o) => ((q.counters || {})[o.id] || 0) < (o.count || 1)); return reste.length > 0 && reste.every((o) => o.kind === 'win' || o.kind === 'significantWin'); } catch (e) { return false; } }
   async function allerAokiri() {
-    if (!aokiriOn() || S.combat || !enMonde() || !S.pos || dansAokiri(S.pos)) { if (S.aokDit && S.pos && dansAokiri(S.pos)) S.aokDit = 0; return false; }
+    if (!aokiriVeut() || S.combat || !enMonde() || !S.pos || dansAokiri(S.pos)) { if (S.aokDit && S.pos && dansAokiri(S.pos)) S.aokDit = 0; return false; }
     const now = Date.now();
     const sc = (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && /kiri|brume/.test(String(x.id))).map((x) => ({ x, l: lieuSceau(x) })).filter((v) => v.l).sort((a, b) => dist(a.l, { x: 82000, y: 38000 }) - dist(b.l, { x: 82000, y: 38000 }))[0];
     if (sc && !(S.tpA > now)) {
@@ -7090,6 +7115,7 @@
         if (!ici && await tourneeSceaux()) return; // Drarito — tournée des sceaux d'abord, puis les quêtes
         let o = (!ici && (cibleBiju() || cibleDonjon() || cibleSceau(estDrarito() ? 3500 : 1500))) || (enMonde() || ici ? objectif() : null); // Drarito — un sceau à moins de 3 500 px (une vingtaine de secondes) : je fais le détour et je le mémorise
         if (!ici && (!o || (o.type === 'attente' && !o.surPlace))) o = cibleSceau(basNivDrarito() ? 6000 : 60000) || o;
+        if (estDrarito() && o && !ici && enMonde()) { const lz = typeof o.x === 'number' ? o : (o.npc ? lieuPNJ(o.npc) : null); if (lz && zoneInterdite(lz)) { if (o.q) S.qPause[o.q] = Date.now() + 1200000; if (o.npc) S.pnjIgnore[o.npc] = Date.now() + 1200000; o = null; } } // V14.60 — but dans un coin interdit
         if (aokiriOn() && o && !ici && enMonde()) { // Drarito — option Aokiri : tout objectif hors du Pays de l'Eau (grade, clan, bijū, donjon…) est laissé de côté, je chasse à la place
           const lo = typeof o.x === 'number' ? o : (o.npc ? lieuPNJ(o.npc) : null);
           if (lo && !dansAokiri(lo)) { if (o.npc) S.pnjIgnore[o.npc] = Date.now() + 1200000; if (o.q) S.qPause[o.q] = Date.now() + 1200000; o = null; }
@@ -7982,6 +8008,19 @@
     const normal = S.combat || S.pauseFin > now || CFG.mode === 'groupe' || /^Repos|^Pause|^AFK groupe|j’attends sur place|Connexion au jeu|Parchemin|Sceau : voyage/.test(String(S.statut || '')); // attendre un boss ou se reposer n'est pas être bloqué
     if (normal) { VEILLE.pos = null; if (S.pauseFin > now || CFG.mode === 'groupe' || /j’attends sur place|^Pause|^AFK/.test(String(S.statut || ''))) VEILLE.gainT = now; return; } // pendant une pause voulue, ni rappel ni rechargement
     if (!VEILLE.pos || dist(VEILLE.pos, S.pos) > 220) { VEILLE.pos = { x: S.pos.x, y: S.pos.y }; VEILLE.posT = now; }
+    if (estDrarito()) { // V14.60 — Drarito : aller-retour sur place (crochets d'« Indécision » sans fin) = bloqué, même si je bouge un peu
+      const H = VEILLE.hist = (VEILLE.hist || []).filter((h) => now - h.t < 100000); H.push({ t: now, x: S.pos.x, y: S.pos.y, g: VEILLE.gainT });
+      if (H.length >= 18 && now - H[0].t > 85000 && VEILLE.gainT < H[0].t) {
+        const xs = H.map((h) => h.x), ys = H.map((h) => h.y), boite = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+        const but = S.navBut && now - S.navBut.t < 60000 ? S.navBut : null;
+        if (boite < 900 && but && dist(but, S.pos) > 700) {
+          VEILLE.hist = []; bloqueZoneDrarito(but, 'je fais des allers-retours depuis 90 s sans l’atteindre');
+          VEILLE.osc = (VEILLE.osc || []).filter((t) => now - t < 900000); VEILLE.osc.push(now);
+          if (VEILLE.osc.length >= 3) { VEILLE.osc = []; VEILLE.n = Math.max(VEILLE.n, 1); VEILLE.dernier = 0; await debloque('trois allers-retours bloqués en 15 min'); return; } // je change d'endroit (sceau le plus proche)
+          return;
+        }
+      }
+    }
     if (VEILLE.n < 0) { if (now - VEILLE.dernier > 300000) { VEILLE.n++; VEILLE.dernier = now; } return; }
     if (now - VEILLE.dernier < (estDrarito() ? 60000 : 150000)) return; // on laisse à chaque essai le temps d'agir
     const immobile = now - VEILLE.posT > (estDrarito() ? 75000 : 240000), sterile = now - VEILLE.gainT > 720000; // Drarito — immobile 75 s hors combat et hors repos : je réagis tout de suite
