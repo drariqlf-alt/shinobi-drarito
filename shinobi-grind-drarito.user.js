@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.54.0
+// @version     14.55.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.54-Drarito';
+  const VERSION = 'V14.55-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1307,6 +1307,10 @@
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
       }
+      if (estDrarito() && CFG.drV11 !== 1) { // Drarito — option Aokiri activée à la demande du joueur
+        Object.assign(CFG, { drV11: 1, aokiri: 1, mode: 'xp', meute: 6, coffreHoraire: 1, evAller: 1, coffreOuvre: 1 }); sauve();
+        note('Drarito : option Aokiri activée — coffres du Pays de l’Eau (un par heure, règle du jeu) et farm des groupes de monstres entre deux coffres. Pour revenir aux quêtes : Réglages → Aokiri (non) et mode Quêtes.');
+      }
       if (estDrarito() && CFG.drV10 !== 1) { CFG.drV10 = 1; CFG.journalFichier = 1; sauve(); note('Drarito : journal enregistré dans Téléchargements toutes les 10 min (Réglages → Journal dans un fichier).'); }
       if (estDrarito() && CFG.drV9 !== 1) { // Drarito — grille agrandie + carte de l'ami
         CFG.drV9 = 1; sauve(); const nA = fusionneCarteAmi(); B.tourKO = {}; S.tourFiniDit = false; NAV.memo.clear();
@@ -1784,6 +1788,7 @@
       else if (CFG.mode === 'farm' ? dist(m, S.ancre) > CFG.rayon : dist(m, S.pos) > CFG.dmax) return;
       const noms = (especesDe(m) || []).map((k) => ((B.especes[k] || CAT[k] || {}).nom || '') + ' ' + k).join(' ');
       if (f && (m.id + ' ' + (m.pack || []).join(' ') + ' ' + noms).toLowerCase().indexOf(f) < 0) return;
+      if (aokiriOn() && !dansAokiri(m)) return; // Drarito — option Aokiri : je ne chasse qu'au Pays de l'Eau
       if (basNivDrarito() && (espece ? bloqueAppris(m) : !atteignable(m, String(m.id).split('/')[0]))) return; // Drarito — cible derrière un passage impossible ou hors de portée
       const e = estime(m, S.maxHp);
       if (e) {
@@ -3433,6 +3438,7 @@
       const e = B.especes[k];
       if (!e || !e.lieu || !(e.xp > 0) || !(e.duree > 0) || !(e.n >= 2) || !e.niv || e.niv < S.niveau - 14 || e.niv > S.niveau + 5 || (e.perdu || 0) > 0.5 * mx || (CAT[k] || {}).rang === 'boss' || S.pnjIgnore['zone:esp:' + k] > now) return;
       if ((B.dangers || []).some((d) => d.niv > S.niveau + 5 && Math.abs(d.x - e.lieu.x) < 1500 && Math.abs(d.y - e.lieu.y) < 1500)) return;
+      if (aokiriOn() && !dansAokiri(e.lieu)) return; // Drarito — option Aokiri : coins de chasse du Pays de l'Eau seulement
       if (basNivDrarito() && !atteignable(e.lieu, e.lieu.z)) return; // Drarito — coin de chasse que je ne sais pas rejoindre
       const dM = dist(e.lieu, S.pos), trajet = Number(CFG.sceaux) && dM > 4500 ? 30 + 1800 / (S.vitesse || 150) : dM / (S.vitesse || 150);
       const xpm = 60 * e.xp / (e.duree + 15), sc = e.xp / (e.duree + 15 + trajet / 10);
@@ -6183,6 +6189,23 @@
     return n;
   }
   const estDrarito = () => !!(S.self && String(S.self.name || '') === 'Drarito');
+  // V14.55 — Drarito : option « Aokiri » (Réglages). Je reste au Pays de l'Eau (Aokiri) : j'y ouvre les coffres mystérieux dès que le jeu
+  // en permet un (un par heure, règle du jeu), et entre deux coffres je farme les groupes de monstres de la région, en attendant leur retour.
+  const aokiriOn = () => estDrarito() && Number(CFG.aokiri) === 1;
+  const dansAokiri = (p) => !!(p && typeof p.x === 'number' && p.x >= 72000 && p.x <= 95000 && p.y >= 26000 && p.y <= 52000); // îles du Pays de l'Eau (Port de la Brume, Grève, Roselières, Aokiri, Récifs)
+  async function allerAokiri() {
+    if (!aokiriOn() || S.combat || !enMonde() || !S.pos || dansAokiri(S.pos)) { if (S.aokDit && S.pos && dansAokiri(S.pos)) S.aokDit = 0; return false; }
+    const now = Date.now();
+    const sc = (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && /kiri|brume/.test(String(x.id))).map((x) => ({ x, l: lieuSceau(x) })).filter((v) => v.l).sort((a, b) => dist(a.l, { x: 82000, y: 38000 }) - dist(b.l, { x: 82000, y: 38000 }))[0];
+    if (sc && !(S.tpA > now)) {
+      if (!S.aokDit) { S.aokDit = 1; note('Aokiri : je pars au Pays de l’Eau par le ' + (sc.x.name || sc.x.id) + ' (coffres + farm des groupes)'); }
+      stop(); gpsArret(); S.tpA = now + 60000; envoie('teleport.remote', { destinationId: sc.x.id });
+      await attend((ev, d) => ev === 'world.joined' || (ev === 'server.error' && d.scope !== 'combat'), 3500);
+      await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null; return true;
+    }
+    if (!sc) { if (S.aokDit !== 2) { S.aokDit = 2; note('Aokiri : aucun sceau du Pays de l’Eau découvert — allez une fois à la main au Port de la Brume ou à Aokiri pour toucher le sceau'); } statut('Aokiri : sceau du Port de la Brume ou d’Aokiri à découvrir à la main', true); return false; }
+    return false;
+  }
   const basNivDrarito = () => estDrarito() && CFG.mode !== 'tresor'; // Drarito — règle fixe, sans palier de niveau : il ne part que là où il sait aller (voir atteignable)
   // Drarito — un endroit est « atteignable » s'il est à moins de 8 000 px, ou si un sceau découvert (et payable) est dans sa zone ou une zone voisine.
   // Plus il découvre de sceaux, plus son rayon d'action s'agrandit tout seul : rien à réinstaller à chaque palier.
@@ -6862,6 +6885,7 @@
       if (await retourApresCoffre()) return; // V14.40 — coffre ouvert : je rentre à mon farm
       if ((CFG.mode === 'tresor' || coffreHoraire()) && await sceauCoffres()) return; // V14.33 — une fois par heure : un sceau vers le coffre le plus proche d'un sceau
       if (await allerEvent()) return; // V14.1 — événement à rejoindre
+      if (await allerAokiri()) return; // V14.55 — option Aokiri : je rejoins le Pays de l'Eau
       if (CFG.mode === 'tresor') { // V14.32 — mode Trésors : uniquement les coffres. Plus rien à ouvrir : j'attends ici (je ne chasse pas)
         const P = S.pauseCoffre;
         if (Date.now() < (B.coffreDispoA || 0) && P && P.w === S.mapId && S.pos && dist(P, S.pos) > 48 && (P.essais = (P.essais || 0) + 1) < 60 && navigue({ x: P.x, y: P.y, zone: 'pause-coffre', label: 'pause après le coffre' })) { statut('🎁 Je m’écarte un peu du coffre — prochain à ' + new Date(B.coffreDispoA).toTimeString().slice(0, 5), true); return; }
@@ -8275,6 +8299,7 @@
   // Drarito — sous le niveau 15, pas de traversée du continent pour un coffre ou un événement : seulement ceux à moins de 6 000 px (environ 35 s de marche).
   // Les coffres lointains ne bloquent plus les quêtes (prologue d'Iruka compris).
   function evTropLoin(x) {
+    if (x && aokiriOn()) return !dansAokiri(x); // Drarito — option Aokiri : tous les coffres du Pays de l'Eau, aucun ailleurs
     if (!x || !basNivDrarito()) return false;
     if (!S.pos) return true; // position inconnue (changement de carte, reconnexion) : prudence
     return !atteignable(x, x.zoneId);
@@ -8517,6 +8542,7 @@
       ['biju', 'Aller aux antres de bijū ouverts', OUI],
       ['sceauxDecouvre', 'Aller découvrir les sceaux manquants', OUI],
       ['tournee', 'Tournée des sceaux : découvrir tous les sceaux atteignables, puis les quêtes', OUI],
+      ['aokiri', 'Aokiri : coffres du Pays de l’Eau (un par heure) + farm des groupes de monstres entre deux coffres', OUI],
       ['journalFichier', 'Journal dans un fichier (Téléchargements, toutes les 10 min) pour la vérification automatique', OUI],
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
       ['evAller', 'M’emmener aux événements signalés (caravane, objet ou technique au sol) — sans rien ramasser', OUI],
