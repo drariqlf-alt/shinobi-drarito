@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.65.0
+// @version     14.66.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.65-Drarito';
+  const VERSION = 'V14.66-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -703,6 +703,7 @@
   const signature = (ev, c) => ev + (c && c.action ? ':' + c.action.type + ':' + (c.action.skillId || '') : '');
   const ENVOI = { dernier: 0, sig: '', bannis: new Set(), silence: 0 };
   const envoie = (ev, corps) => {
+    if (ev === 'teleport.remote' && !Number(CFG.sceaux) && S.self && S.self.name === 'Drarito') { if (!S.tpRefusDit) { S.tpRefusDit = 1; note('Sceaux désactivés : pas de téléportation, j’y vais à pied'); } return false; } // V14.66
     if (MORT_PERSO || !S.sock || S.sock.readyState !== 1 || Date.now() < ENVOI.silence) return false;
     const format = FORMATS[ev];
     let propre = null;
@@ -1312,6 +1313,10 @@
       if (!estCiel() && CFG.profil !== 'ami' && CFG.profil !== 'drarito') { // V14.41 — autre personnage (bot prêté) : rien de ce qui est réglé pour Ciel ne touche à son stuff ni à ses points
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
+      }
+      if (estDrarito() && CFG.drV13 !== 1) { // V14.66 — Drarito : sceaux désactivés à la demande du joueur, tout se fait à pied (le Pays de l'Eau est une île : option Aokiri coupée)
+        Object.assign(CFG, { drV13: 1, sceaux: 0, tournee: 0, sceauxDecouvre: 0, aokiri: 0 }); sauve(); S.tour = null;
+        note('Drarito : sceaux désactivés — je fais tout à pied, rayon d’action 45 000 px (Réglages → En chemin → « Voyager par les sceaux » pour les remettre). Chaque case parcourue, par moi ou par vous à la main, est retenue pour les trajets suivants.');
       }
       if (estDrarito() && CFG.drV12 !== 1) { // Drarito — option Aokiri : quêtes du Pays de l'Eau entre deux coffres
         Object.assign(CFG, { drV12: 1, mode: Number(CFG.aokiri) === 1 ? 'quetes' : CFG.mode }); sauve();
@@ -6382,7 +6387,7 @@
     if (!p) return true;
     if (!enMonde() || p.porte || (p.carte && !/^world-/.test(String(p.carte)))) return true; // V14.64 — dans un bâtiment (coordonnées d'intérieur) ou porte d'un bâtiment : toujours atteignable (sinon il entrait et ressortait en boucle)
     if (S.pos && enMonde() && (!p.w || p.w === S.mapId) && dist(p, S.pos) <= 8000 && !bloqueAppris(p)) return true;
-    if (expeditionDrarito() && S.pos && (!p.w || p.w === S.mapId) && dist(p, S.pos) <= 45000 && !bloqueAppris(p) && !zoneTropHaute(p)) return true; // V14.65 — expédition : plus rien de faisable autour de moi, je pars loin (à pied ou par sceau)
+    if ((expeditionDrarito() || !Number(CFG.sceaux)) && S.pos && (!p.w || p.w === S.mapId) && dist(p, S.pos) <= 45000 && !bloqueAppris(p) && !zoneTropHaute(p)) return true; // V14.65 — expédition : plus rien de faisable autour de moi, je pars loin (à pied ou par sceau)
     return !!sceauPourDrarito(p);
   }
   // V14.65 — EXPÉDITION : quand toutes les quêtes sont « trop loin » et qu'il ne reste que des ennemis bien trop faibles autour de moi
@@ -6454,6 +6459,7 @@
     return echoue('inaccessible (chemin bloqué)');
   }
   function sceauPourDrarito(p) {
+    if (!Number(CFG.sceaux)) return null; // V14.66 — tout à pied
     if (!p || typeof p.x !== 'number') return null;
     let best = null;
     (S.sceaux || []).forEach((x) => {
@@ -8800,7 +8806,7 @@
         if (ko || pd) { const b = el('button', 'b large', '▶ Relancer ' + nomDj(v) + ' maintenant (en pause ' + (ko ? Math.ceil((B.djKO[v] - Date.now()) / 60000) + ' min' : 'jusqu’au niveau ' + pd) + ')'); b.onclick = () => { if (B.djKO) delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; if (S.djRefus) S.djRefus[v] = 0; sauveB(); note('Donjon ' + nomDj(v) + ' : pause levée à la main'); b.textContent = 'Pause levée ✓'; b.disabled = true; }; ctx.append(b); } }
       else if (CFG.mode === 'quetes') { blocReg(ctx, 'Quêtes', [['villagesPrio', 'Villages prioritaires'], ['quotidiennes', 'Missions quotidiennes (réputation)']]); ctx.append(el('div', 'sec', 'Quêtes en cours')); quetes = corpsQuetes(); ctx.append(quetes.el); quetes.maj(); }
       if (estDrarito()) blocReg(ctx, 'Pays de l’Eau (Aokiri)', [['aokiri', 'Option Aokiri']], 'Oui : coffres mystérieux du Pays de l’Eau dès qu’un est permis (un par heure), sinon les quêtes du Pays de l’Eau, sinon farm des groupes de monstres. Laissez le mode sur Quêtes. Non : quêtes sur tout le continent.'); // V14.58 — l'option était cachée
-      blocReg(ctx, 'En chemin', [['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
+      blocReg(ctx, 'En chemin', [['sceaux', 'Voyager par les sceaux (sinon tout à pied)'], ['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
       { // V14.0 — énigmes des marchands ambulants
         const E = B.enig || { r: {}, faits: {}, ko: {} }, ks = Object.keys(E.r || {}).filter((k) => enigActive(E.r[k]) || (E.faits[E.r[k].place] && Date.now() - E.faits[E.r[k].place] < 2 * 3600000)).sort((a, b) => E.r[b].vu - E.r[a].vu).slice(0, 6);
         ctx.append(el('div', 'sec', 'Énigmes des marchands'));
