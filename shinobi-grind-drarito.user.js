@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.63.1
+// @version     14.64.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.63.1-Drarito';
+  const VERSION = 'V14.64-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2289,7 +2289,7 @@
   }
   const AG = new Float32Array(GW * GH), AP = new Int32Array(GW * GH), AS = new Uint32Array(GW * GH);
   let aTour = 0;
-  function astarMonde(dep, arr, libre) {
+  function astarMonde(dep, arr, libre, sansMarge) {
     if (dep.x < 1 || dep.y < 1 || arr.x < 1 || arr.y < 1 || dep.x >= GW - 1 || dep.y >= GH - 1 || arr.x >= GW - 1 || arr.y >= GH - 1) return null;
     aTour++;
     const maintenant = Date.now(), tmp = new Set();
@@ -2300,6 +2300,20 @@
     // Un mur connu reste un mur, même tout près de moi. Seule exception (« libre ») : quand je suis enfermé d'après la carte, je m'autorise
     // à traverser les trois cases autour de moi. Un obstacle que je viens de heurter n'est jamais traversé.
     const mr = (i) => (aTmp && tmp.has(i)) || (GRILLE[i] === 2 && !PASSE[i] && !(libre && pres(i)));
+    // V14.64 — Drarito : marge de sécurité autour des obstacles. Les objets (rochers, arbres, murailles) ont une hitbox plus large que leur case
+    // et le personnage a lui-même une épaisseur : une case qui touche un obstacle est interdite (sauf déjà parcourue sans heurt,
+    // ou tout près du départ et de l'arrivée), et les cases à deux de distance coûtent plus cher. Si aucun chemin n'existe avec cette marge,
+    // je recalcule sans elle.
+    const marge = estDrarito() && !libre && !sansMarge;
+    const prochesFin = (i) => { const x = i % GW, y = (i / GW) | 0; return (Math.abs(x - dep.x) <= 2 && Math.abs(y - dep.y) <= 2) || (Math.abs(x - arr.x) <= 2 && Math.abs(y - arr.y) <= 2); };
+    const mb = (j) => GRILLE[j] === 2 && !PASSE[j]; // mur brut (rapide)
+    const murA = (i, r) => { // un mur sur l'anneau de rayon r autour de la case i
+      if (r === 1) return mb(i - GW - 1) || mb(i - GW) || mb(i - GW + 1) || mb(i - 1) || mb(i + 1) || mb(i + GW - 1) || mb(i + GW) || mb(i + GW + 1);
+      const g = 2 * GW; for (let k = -2; k <= 2; k++) if (mb(i - g + k) || mb(i + g + k)) return true;
+      for (let k = -1; k <= 1; k++) if (mb(i + k * GW - 2) || mb(i + k * GW + 2)) return true; return false;
+    };
+    const MEMO = marge ? new Map() : null; // une seule évaluation par case et par calcul
+    const tropPres = (i) => { if (!marge || PASSE[i]) return false; let v = MEMO.get(i); if (v === undefined) { v = !prochesFin(i) && murA(i, 1); MEMO.set(i, v); } return v; };
     const h = (i) => { const dx = Math.abs((i % GW) - arr.x), dy = Math.abs(((i / GW) | 0) - arr.y); return Math.max(dx, dy) + 0.41 * Math.min(dx, dy); };
     const tf = [], ti = []; // tas binaire
     const pousse = (f, i) => { let k = tf.length; tf.push(f); ti.push(i); while (k > 0) { const p = (k - 1) >> 1; if (tf[p] <= tf[k]) break; const a = tf[p], b = ti[p]; tf[p] = tf[k]; ti[p] = ti[k]; tf[k] = a; ti[k] = b; k = p; } };
@@ -2321,13 +2335,14 @@
       if (x < 1 || y < 1 || x >= GW - 1 || y >= GH - 1) continue;
       for (let d = 0; d < 8; d++) {
         const ni = i + DX[d] + DY[d] * GW;
-        if (mr(ni) && ni !== but) continue;
-        if (d > 3 && (mr(i + DX[d]) || mr(i + DY[d] * GW))) continue; // pas de coupe en diagonale
+        if ((mr(ni) || tropPres(ni)) && ni !== but) continue;
+        if (d > 3 && (mr(i + DX[d]) || mr(i + DY[d] * GW) || tropPres(i + DX[d]) || tropPres(i + DY[d] * GW))) continue; // pas de coupe en diagonale (ni contre un coin d'obstacle)
         let cout = d > 3 ? 1.41 : 1;
         if (PASSE[ni]) cout *= 0.55; // déjà parcourue sans heurt : c'est la route qu'on préfère
         else {
           if (GRILLE[ni] === 0) cout += 0.6; // terrain jamais vu : possible, mais on préfère ce qu'on connaît
           if (mr(ni + 1) || mr(ni - 1) || mr(ni + GW) || mr(ni - GW)) cout += 1.5; // on évite de raser les murs
+          if (marge && murA(ni, 2)) cout += 2; // Drarito — deux cases avant l'obstacle : je m'écarte déjà
         }
         const ng = gc + cout;
         if (AS[ni] === aTour && AG[ni] <= ng) continue;
@@ -2345,7 +2360,16 @@
     return route;
   }
   function astar(dep, arr) {
-    if (enMonde()) { let r = astarMonde(dep, arr, false); if (r && !NAV.atteint && NAV.petit) r = astarMonde(dep, arr, true); if (r) return r; }
+    if (enMonde()) {
+      let r = astarMonde(dep, arr, false);
+      if (estDrarito() && r && !NAV.atteint) { // V14.64 — pas de chemin avec la marge : je recalcule sans elle et je garde le meilleur
+        const e1 = { r, atteint: NAV.atteint, reste: NAV.resteCases, petit: NAV.petit, ferme: NAV.ferme, dans: NAV.butDansCarte };
+        const r2 = astarMonde(dep, arr, false, true);
+        if (!(r2 && (NAV.atteint || NAV.resteCases < e1.reste))) { r = e1.r; NAV.atteint = e1.atteint; NAV.resteCases = e1.reste; NAV.petit = e1.petit; NAV.ferme = e1.ferme; NAV.butDansCarte = e1.dans; } else r = r2;
+      }
+      if (r && !NAV.atteint && NAV.petit) r = astarMonde(dep, arr, true);
+      if (r) return r;
+    }
     NAV.ferme = false;
     // Le calcul couvre tout le rectangle entre moi et le but, avec une marge pour contourner lacs et falaises ;
     // au-delà de 320 cases de côté, on vise un point intermédiaire sur la ligne droite.
@@ -2398,10 +2422,12 @@
   const tuile = (p) => ({ x: Math.floor(p.x / 32), y: Math.floor(p.y / 32) });
   function vueLibre(a, b) {
     const n = Math.ceil(dist(a, b) / 14);
-    const d = dist(a, b) || 1, px = -(b.y - a.y) / d * 13, py = (b.x - a.x) / d * 13; // le personnage a une épaisseur : on vérifie aussi 13 px de chaque côté de la ligne
+    const d = dist(a, b) || 1, e = estDrarito() ? 26 : 13, px = -(b.y - a.y) / d * e, py = (b.x - a.x) / d * e; // le personnage a une épaisseur : on vérifie de chaque côté de la ligne (Drarito : 26 px, hitbox des objets comprise)
+    const qx = -(b.y - a.y) / d * 13, qy = (b.x - a.x) / d * 13;
     for (let i = 1; i <= n; i++) {
       const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n;
       if (mur(Math.floor(x / 32), Math.floor(y / 32)) || mur(Math.floor((x + px) / 32), Math.floor((y + py) / 32)) || mur(Math.floor((x - px) / 32), Math.floor((y - py) / 32))) return false;
+      if (e > 13 && (mur(Math.floor((x + qx) / 32), Math.floor((y + qy) / 32)) || mur(Math.floor((x - qx) / 32), Math.floor((y - qy) / 32)))) return false;
     }
     return true;
   }
@@ -2616,7 +2642,18 @@
     else for (let i = Math.min(NAV.route.length - 1, 14); i > 0; i--) { const p = centre(NAV.route[i]); if (vueLibre(S.pos, p)) { vise = p; NAV.route.splice(0, i); break; } }
     const dx = vise.x - S.pos.x, dy = vise.y - S.pos.y;
     const fin = Math.max(Math.abs(dx), Math.abs(dy)) * 0.35;
-    bouge({ x: Math.abs(dx) > Math.max(7, Math.min(fin, Math.abs(dy) * 0.42)) ? Math.sign(dx) : 0, y: Math.abs(dy) > Math.max(7, Math.min(fin, Math.abs(dx) * 0.42)) ? Math.sign(dy) : 0 });
+    let dir = { x: Math.abs(dx) > Math.max(7, Math.min(fin, Math.abs(dy) * 0.42)) ? Math.sign(dx) : 0, y: Math.abs(dy) > Math.max(7, Math.min(fin, Math.abs(dx) * 0.42)) ? Math.sign(dy) : 0 };
+    if (estDrarito() && (dir.x || dir.y)) { // V14.64 — je regarde 2-3 cases devant moi avant d'avancer, hitbox du personnage comprise
+      const devant = (k, d) => { for (const lat of [-12, 0, 12]) { const ox = d.y ? lat : 0, oy = d.x ? lat : 0; if (mur(Math.floor((S.pos.x + d.x * 32 * k + ox) / 32), Math.floor((S.pos.y + d.y * 32 * k + oy) / 32))) return true; } return false; };
+      const bloqueDir = (d) => devant(1, d) || devant(2, d);
+      const loin = Math.hypot(dx, dy) > 70;
+      if (loin && bloqueDir(dir)) {
+        const alts = [{ x: dir.x, y: 0 }, { x: 0, y: dir.y }].filter((a) => (a.x || a.y) && !(a.x === dir.x && a.y === dir.y) && !bloqueDir(a)).sort((a, b) => (b.x * dx + b.y * dy) - (a.x * dx + a.y * dy));
+        if (alts.length) dir = alts[0]; // je glisse le long de l'obstacle au lieu de taper dedans
+        if (NAV.anticipeT !== Math.floor(maintenant / 1500)) { NAV.anticipeT = Math.floor(maintenant / 1500); NAV.calcul = 0; NAV.memo.clear(); } // et je recalcule la route tout de suite
+      } else if (loin && devant(3, dir) && NAV.anticipeT !== Math.floor(maintenant / 3000)) { NAV.anticipeT = Math.floor(maintenant / 3000); NAV.calcul = 0; } // obstacle à 3 cases : je recalcule déjà
+    }
+    bouge(dir);
     return true;
   }
 
@@ -3154,6 +3191,10 @@
       force = true; // presque arrivé : on tente quand même
     }
     stop();
+    if (p.porte && estDrarito()) { // V14.64 — garde-fou : entrer plus de 3 fois dans le même bâtiment en 3 min = boucle, je laisse ce PNJ 20 min
+      const now = Date.now(), E = S.entrees = S.entrees || {}; E[p.porte] = (E[p.porte] || []).filter((t) => now - t < 180000); E[p.porte].push(now);
+      if (E[p.porte].length > 3) { E[p.porte] = []; S.pnjIgnore[npcId] = now + 1200000; if (S.objQ) { S.qPause[S.objQ] = now + 1200000; (S.qRaison = S.qRaison || {})[S.objQ] = 'boucle entrée/sortie'; } S.objTenu = null; note('Bâtiment ' + p.porte + ' : j’entre et je ressors en boucle — je laisse ' + nom + ' 20 min et je passe à autre chose'); return; }
+    }
     if (p.porte) {
       if (await franchit({ mapId: 'world-exterieur', portalId: 'konoha-village/entree-' + p.porte }, 'Entrée : ' + p.porte, p, { x: 0, y: ((B.portes || {})[p.porte] || {}).vy || -1 /* les portes des bâtiments de Konoha donnent au sud : on entre en montant */ }, p.porte)) S.porteEchec = 0;
       else { // la position exacte du joueur aide à corriger l'emplacement de la porte
@@ -6290,7 +6331,7 @@
   }
   const zoneInterdite = (p) => !!(p && typeof p.x === 'number' && (S.zonesKO || []).some((z) => z.fin > Date.now() && dist(z, p) < z.r));
   const aokiriOn = () => estDrarito() && Number(CFG.aokiri) === 1;
-  const dansAokiri = (p) => !!(p && typeof p.x === 'number' && p.x >= 72000 && p.x <= 95000 && p.y >= 26000 && p.y <= 52000); // îles du Pays de l'Eau (Port de la Brume, Grève, Roselières, Aokiri, Récifs)
+  const dansAokiri = (p) => !enMonde() || !!(p && p.porte) || !!(p && typeof p.x === 'number' && p.x >= 72000 && p.x <= 95000 && p.y >= 26000 && p.y <= 52000); // îles du Pays de l'Eau (Port de la Brume, Grève, Roselières, Aokiri, Récifs)
   // V14.60 — l'option Aokiri ne retient au Pays de l'Eau que quand il y a quelque chose à y faire : un coffre permis (ou bientôt),
   // ou une quête de la région faisable. Sinon, au niveau 55 les monstres d'Aokiri (niveau 30-35) ne rapportent presque rien :
   // je vais farmer les groupes à mon niveau là où je sais aller, puis je reviens au prochain coffre.
@@ -6339,6 +6380,7 @@
   }
   function atteignable(p, zone) {
     if (!p) return true;
+    if (!enMonde() || p.porte || (p.carte && !/^world-/.test(String(p.carte)))) return true; // V14.64 — dans un bâtiment (coordonnées d'intérieur) ou porte d'un bâtiment : toujours atteignable (sinon il entrait et ressortait en boucle)
     if (S.pos && enMonde() && (!p.w || p.w === S.mapId) && dist(p, S.pos) <= 8000 && !bloqueAppris(p)) return true;
     return !!sceauPourDrarito(p);
   }
