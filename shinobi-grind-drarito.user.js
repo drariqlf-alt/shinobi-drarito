@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.68.0
+// @version     14.69.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.68-Drarito';
+  const VERSION = 'V14.69-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1313,6 +1313,10 @@
       if (!estCiel() && CFG.profil !== 'ami' && CFG.profil !== 'drarito') { // V14.41 — autre personnage (bot prêté) : rien de ce qui est réglé pour Ciel ne touche à son stuff ni à ses points
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
+      }
+      if (estDrarito() && CFG.drV15 !== 1) { // V14.69 — le joueur a refait à pied la route Kumo → ouest : les « passages impossibles » appris avant sont oubliés, le bot réessaie
+        CFG.drV15 = 1; B.barrieres = {}; sauve(); sauveB(); NAV.memo.clear();
+        note('Drarito : passages impossibles oubliés (votre trajet à pied est retenu) · longs trajets par le GPS du jeu au-delà de 5 000 px');
       }
       if (estDrarito() && CFG.drV14 !== 1) { // V14.67 — Drarito : RUSH QUÊTES définitif, à pied, avec les coffres mystérieux (un par heure)
         Object.assign(CFG, { drV14: 1, drV13: 1, mode: 'quetes', sceaux: 0, tournee: 0, sceauxDecouvre: 0, aokiri: 0, donjons: 0, biju: 0, enigmes: 0, evAller: 1, coffreOuvre: 1, coffreHoraire: 1 }); sauve(); S.tour = null;
@@ -3196,6 +3200,7 @@
     if (d > (p.porte ? 40 : sur ? portee : 140)) {
       if (await voyageSceau(p, NPCZ[npcId])) return;
       if (await rappel(p, npcId)) return;
+      if (!p.porte && gpsLoin(p, 'pnj:' + npcId)) { statut('→ ' + nom + ' (' + pourquoi + ') · ' + Math.round(d) + ' px · GPS du jeu', true); return; } // V14.69
       statut('→ ' + nom + ' (' + pourquoi + ') · ' + Math.round(d) + ' px', true);
       if (navigue(p)) return;
       stop();
@@ -7324,6 +7329,7 @@
             note('Quête : ' + ((B.especes[k] || CAT[k] || {}).nom || k) + ' absent en ' + Math.round(o.x) + ',' + Math.round(o.y) + (boss ? ' après 2 min 50 d’attente' : '') + ' — je vais voir un autre emplacement');
             return;
           }
+          if (gpsLoin(o, String(o.zone || o.label))) { statut('→ ' + o.label + ' · ' + Math.round(dist(o, S.pos)) + ' px · GPS du jeu', true); return; } // V14.69
           if (dist(o, S.pos) < 60 || !navigue(o)) { stop(); S.objStop = Date.now(); if (/^biju:/.test(String(o.zone))) retiens('arrivé pour ' + o.zone, 'position ' + Math.round(S.pos.x) + ',' + Math.round(S.pos.y) + ' · ennemis proches : ' + [...S.mobs.values()].filter((m) => typeof m.x === 'number' && dist(m, S.pos) < 1500).map((m) => m.id).slice(0, 25).join(', ')); S.vaKO = S.vaKO || {}; const nbKO = S.vaKO[o.zone] = (S.vaKO[o.zone] || 0) + 1; S.pnjIgnore['zone:' + o.zone] = Date.now() + (/^biju:/.test(String(o.zone)) ? 1200000 : Math.min(7200000, 240000 * Math.pow(3, nbKO - 1))); note('Arrivé au cœur de la zone sans que la quête avance, ou chemin bloqué : ' + o.label + (nbKO > 1 ? ' (' + nbKO + 'e fois : je laisse cette destination ' + Math.round(Math.min(120, 4 * Math.pow(3, nbKO - 1))) + ' min)' : '')); }
           return;
         }
@@ -7747,6 +7753,18 @@
     S.gps = { cle, to, essais: essais + 1, envoiT: mnt, immobileT: mnt, pos: S.pos ? { x: S.pos.x, y: S.pos.y } : null, carte: S.mapId, route: null, fin: null, refus: null };
     envoie('navigation.request', { to });
     return true;
+  }
+  // V14.69 — LONGS TRAJETS PAR LE GPS DU JEU : au-delà de 5 000 px, je demande l'itinéraire au jeu (comme un joueur avec le GPS) au lieu de le calculer moi-même :
+  // le jeu connaît tout le relief (Kumo, falaises, ponts) et le calcul ne fait plus laguer la page. Refus ou blocage : mon propre chemin, GPS laissé 10 min pour ce but.
+  function gpsLoin(but, cle) {
+    if (!estDrarito() || !enMonde() || !S.pos || !but || typeof but.x !== 'number' || S.combat) return false;
+    const now = Date.now(); S.gpsKO = S.gpsKO || {};
+    const enCours = S.gps && /^loin:/.test(String(S.gps.cle || ''));
+    if (dist(but, S.pos) < 5000 || (but.w && but.w !== S.mapId) || S.gpsKO[cle] > now) { if (enCours) gpsArret(); return false; }
+    const k = 'loin:' + cle;
+    if (enCours && S.gps.cle !== k) gpsArret();
+    if (gpsVers({ mapId: S.mapId, x: Math.round(but.x), y: Math.round(but.y) }, k)) return true;
+    S.gpsKO[cle] = now + 10 * 60000; return false;
   }
   function gpsArret() { const N = S.gps; S.gps = null; if (N && N.route && N.route.id) try { envoie('navigation.cancel', { id: N.route.id }); } catch (e) {} }
   function gpsRecu(ev, d) {
