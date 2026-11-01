@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.71.0
+// @version     14.72.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.71-Drarito';
+  const VERSION = 'V14.72-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1316,6 +1316,11 @@
       if (!estCiel() && CFG.profil !== 'ami' && CFG.profil !== 'drarito') { // V14.41 — autre personnage (bot prêté) : rien de ce qui est réglé pour Ciel ne touche à son stuff ni à ses points
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
+      }
+      if (estDrarito() && CFG.drV16 !== 1) { // V14.72 — Drarito : FARM DES GROUPES À SON NIVEAU (mode XP rapide), toujours à pied, coffres mystérieux gardés
+        Object.assign(CFG, { drV16: 1, mode: 'xp', meute: 6, evAller: 1, coffreOuvre: 1, coffreHoraire: 1 }); sauve(); S.cibleId = null; S.objTenu = null; gpsArret();
+        note('Drarito : FARM — je chasse les groupes d’ennemis de mon niveau qui rapportent le plus d’XP à l’heure, en restant dans la zone tant qu’il y en a (Réglages → mode « Quêtes » pour revenir aux quêtes).');
+        try { tgDit('⚔️ Mode farm : groupes d’ennemis de mon niveau, au meilleur rendement XP/heure. Coffres mystérieux toujours ouverts (1 par heure).'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV15 !== 1) { // V14.69 — le joueur a refait à pied la route Kumo → ouest : les « passages impossibles » appris avant sont oubliés, le bot réessaie
         CFG.drV15 = 1; B.barrieres = {}; sauve(); sauveB(); NAV.memo.clear();
@@ -7785,8 +7790,12 @@
     if (dist(but, S.pos) < 5000 || (but.w && but.w !== S.mapId) || S.gpsKO[cle] > now) { if (enCours) gpsArret(); return false; }
     const k = 'loin:' + cle;
     if (enCours && S.gps.cle !== k) gpsArret();
+    if ((S.gpsHS || 0) > now) return false; // V14.72 — GPS du jeu en panne : laissé de côté 1 h
     if (gpsVers({ mapId: S.mapId, x: Math.round(but.x), y: Math.round(but.y) }, k)) return true;
-    S.gpsKO[cle] = now + 10 * 60000; return false;
+    S.gpsKO[cle] = now + 10 * 60000;
+    S.gpsEchecs = (S.gpsEchecs || []).filter((t) => now - t < 1800000).concat([now]);
+    if (S.gpsEchecs.length >= 2) { S.gpsHS = now + 3600000; S.gpsEchecs = []; note('GPS du jeu : deux échecs en 30 min — je ne l’utilise plus pendant 1 h, je prends mes propres chemins'); }
+    return false;
   }
   function gpsArret() { const N = S.gps; S.gps = null; if (N && N.route && N.route.id) try { envoie('navigation.cancel', { id: N.route.id }); } catch (e) {} }
   function gpsRecu(ev, d) {
