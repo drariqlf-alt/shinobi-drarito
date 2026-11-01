@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.73.0
+// @version     14.74.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.73-Drarito';
+  const VERSION = 'V14.74-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -8471,7 +8471,7 @@
     cfg: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
     log: '<svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
   };
-  const MODES = { tresor: 'Chasse aux trésors', xp: 'XP rapide', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', groupe: 'AFK groupe' };
+  const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', groupe: 'AFK groupe' };
   const court = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e4 ? Math.round(n / 1000) + ' k' : String(Math.round(n)));
   let ui = null;
   // Avancement de la quête en cours : étapes terminées + objectifs de l'étape actuelle.
@@ -8812,7 +8812,7 @@
   const OUI = { 1: 'Oui', 0: 'Non' };
   const CATEGORIES = [
     ['Objectif', [
-      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'XP rapide', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)' }],
+      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'Farm XP (meilleure zone à mon niveau)', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)' }],
       ['djMarge', 'Mode Donjons : niveaux d’avance sur le donjon (15 = prudent)'],
       ['djChoisi', 'Donjon à enchaîner (mode Donjons)', () => { const o = { '': 'Automatique : le plus rentable dont j’ai la clef' }; try { entreesDj().map((x) => x && (x.dungeonId || x.id)).filter(Boolean).sort((a, b) => (nivDonjon(a) || 999) - (nivDonjon(b) || 999)).forEach((id) => { o[id] = nomDj(id) + ' · niv. ' + (nivDonjon(id) || '?') + ' · ' + nbEnSac('clef-' + id) + ' clef(s)' + (djRend(id) ? ' · ' + court(djRend(id)) + ' XP/min' : ''); }); if (CFG.djChoisi && !o[CFG.djChoisi]) o[CFG.djChoisi] = CFG.djChoisi; } catch (e) {} return o; }],
       ['testTout', 'Tout tester : chaque sort mesuré 5 fois, chaque marionnette posée 2 fois (plus lent au début, plus juste ensuite)', OUI],
@@ -8892,7 +8892,7 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
     CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { CFG.mode = k; sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
