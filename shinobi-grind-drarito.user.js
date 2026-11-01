@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.80.0
+// @version     14.81.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.80-Drarito';
+  const VERSION = 'V14.81-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1860,7 +1860,7 @@
   function choisisZone() {
     if (!S.pos) return null;
     const now = Date.now(), mn = Number(CFG.nivGroupeMin) || 0, mxT = Number(CFG.nivGroupe) || 9999, motifs = [];
-    let best = null;
+    let best = null, garde = null;
     S.mobs.forEach((m) => {
       if (typeof m.x !== 'number') return;
       const d = dist(m, S.pos); if (d > 4000) return;
@@ -1873,8 +1873,10 @@
       if (g.t > mxT) return non('trop fort');
       if (g.ks.some((k) => (B.especes[k] || {}).defaites > 0 && (B.especes[k] || {}).defaites >= (B.especes[k] || {}).n)) return non('déjà perdu contre eux');
       const sc = g.t / (d / (S.vitesse || 220) + 25);
+      if (m.id === S.cibleId) garde = { m, sc };
       if (!best || sc > best.sc) best = { m, sc };
     });
+    if (garde && best && best.sc < 1.6 * garde.sc) best = garde; // V14.81 — je garde ma cible tant qu'une autre n'est pas nettement meilleure (il hésitait entre deux groupes chaque seconde)
     if (best) { const m = best.m; m.est = estime(m, S.maxHp) || null; m.score = best.sc; return m; }
     if (motifs.length && (!S.zoneDiagT || now - S.zoneDiagT > 120000)) { S.zoneDiagT = now; note('Farm de zone — groupes vus mais refusés : ' + motifs.join(' | ')); }
     return null;
@@ -2649,7 +2651,7 @@
   }
   function navigue(but0) {
     if (but0 && typeof but0.x === 'number') S.navBut = { x: but0.x, y: but0.y, t: Date.now() }; // Drarito — le but final, retenu pour le déblocage
-    { let pv = but0 && typeof but0.x === 'number' && porteVillage(but0); const pf = S.porteFixe; if (pv && pf && Date.now() - pf.t < 30000 && dist(pf.but, but0) < 600) pv = pf.p; else if (pv) S.porteFixe = { p: pv, but: { x: but0.x, y: but0.y }, t: Date.now() }; /* V14.78 — une porte choisie est gardée 30 s (il alternait entre deux portes de Kumo) */ if (pv) { if (S.porteDite !== pv.x + ',' + pv.y) { S.porteDite = pv.x + ',' + pv.y; note('Village : je passe par la porte ' + Math.round(pv.x) + ',' + Math.round(pv.y)); } but0 = Object.assign({}, but0, { x: pv.x, y: pv.y }); } } // V14.62 — par la porte du village
+    { let pv = but0 && typeof but0.x === 'number' && !(S.pos && dist(but0, S.pos) < 3000) && porteVillage(but0); /* V14.81 — pas de détour par une porte de village pour une cible toute proche */ const pf = S.porteFixe; if (pv && pf && Date.now() - pf.t < 30000 && dist(pf.but, but0) < 600) pv = pf.p; else if (pv) S.porteFixe = { p: pv, but: { x: but0.x, y: but0.y }, t: Date.now() }; /* V14.78 — une porte choisie est gardée 30 s (il alternait entre deux portes de Kumo) */ if (pv) { if (S.porteDite !== pv.x + ',' + pv.y) { S.porteDite = pv.x + ',' + pv.y; note('Village : je passe par la porte ' + Math.round(pv.x) + ',' + Math.round(pv.y)); } but0 = Object.assign({}, but0, { x: pv.x, y: pv.y }); } } // V14.62 — par la porte du village
     rafraichit();
     const maintenant = Date.now();
     if (NAV.parFleche && maintenant - NAV.parFleche.t < 12000 && dist(NAV.parFleche.but, but0) < 250) { // je contourne en suivant la flèche du jeu
