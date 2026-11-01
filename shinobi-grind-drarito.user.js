@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.76.0
+// @version     14.77.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.76-Drarito';
+  const VERSION = 'V14.77-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1317,6 +1317,7 @@
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
       }
+      if (estDrarito() && CFG.drV19 !== 1) { CFG.drV19 = 1; CFG.drV18 = 1; Object.assign(CFG, { mode: 'xp', nivGroupe: 250, nivGroupeMin: 150, zoneFarm: 'plaine-grise,tour-du-chef' }); sauve(); S.spotVise = null; note('Drarito : farm dans la Plaine grise ET la Tour du chef (ombres de la pluie…) — groupes de 150 à 250 niveaux au total'); try { tgDit('⚔️ Farm : Plaine grise + Tour du chef, groupes de 150 à 250 niveaux au total.'); } catch (e) {} } // V14.77
       if (estDrarito() && CFG.drV18 !== 1) { // V14.76 — demande du joueur : groupes de 150 à 250 niveaux au total, farm fixé dans la Plaine grise
         Object.assign(CFG, { drV18: 1, drV17: 1, mode: 'xp', nivGroupe: 250, nivGroupeMin: 150, zoneFarm: 'plaine-grise' }); sauve(); S.cibleId = null; S.spotVise = null; S.spotForce = null;
         note('Drarito : FARM dans la Plaine grise — groupes de 150 à 250 niveaux au total seulement (Réglages → Combat pour changer la zone ou les bornes).');
@@ -1836,7 +1837,8 @@
   const plafondGroupe = () => (estDrarito() ? Number(CFG.nivGroupe) || 0 : 0);
   const groupeSur = (m) => { const P = plafondGroupe(); if (!P || !S.niveau) return false; const g = nivGroupe(m); return g.t > 0 && g.t <= P && g.mx <= S.niveau + (Number(CFG.nivGroupeMin) ? 35 : 2); }; // V14.76 — avec une borne basse réglée : ennemis jusqu'à +35 niveaux (le joueur bat 2 × niv. 104-109 au niv. 83)
   const groupeInteressant = (m) => { const P = plafondGroupe(); if (!P) return false; const g = nivGroupe(m), mn = Number(CFG.nivGroupeMin) || 0; return mn ? g.t >= mn : (g.t >= 0.6 * P || g.mx >= (S.niveau || 0) - 10); };
-  const zoneFarm = () => (estDrarito() && CFG.mode === 'xp' && CFG.zoneFarm ? String(CFG.zoneFarm) : ''); // V14.76 — zone de farm imposée
+  const zoneFarm = () => (estDrarito() && CFG.mode === 'xp' && CFG.zoneFarm ? String(CFG.zoneFarm) : ''); // V14.76 — zone(s) de farm imposée(s), séparées par des virgules
+  const dansZoneFarm = (z) => zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).indexOf(String(z)) >= 0;
   function choisis(espece, nivMin, meuteVoulue, parmi) {
     if (!S.pos || !S.ancre) return null;
     const maintenant = Date.now();
@@ -1852,7 +1854,7 @@
       const noms = (especesDe(m) || []).map((k) => ((B.especes[k] || CAT[k] || {}).nom || '') + ' ' + k).join(' ');
       if (f && (m.id + ' ' + (m.pack || []).join(' ') + ' ' + noms).toLowerCase().indexOf(f) < 0) return;
       if (estDrarito() && zoneInterdite(m)) return; // Drarito — coin où je n'arrive pas à aller
-      if (!espece && zoneFarm() && String(m.id).split('/')[0] !== zoneFarm()) return; // V14.76 — seulement les groupes de la zone de farm
+      if (!espece && zoneFarm() && !dansZoneFarm(String(m.id).split('/')[0])) return; // V14.76 — seulement les groupes de la zone de farm
       if (!espece && zoneFarm() && Number(CFG.nivGroupeMin) && !groupeInteressant(m)) return; // V14.76 — groupe sous la borne basse : rien à y gagner
       if (!espece && zoneFarm() && plafondGroupe() && nivGroupe(m).t > plafondGroupe()) return; // V14.76 — au-dessus de la borne haute : jamais
       if (aokiriVeut() && !dansAokiri(m)) return; // Drarito — option Aokiri : au Pays de l'Eau tant qu'un coffre ou une quête m'y attend
@@ -3629,7 +3631,7 @@
     let best = null;
     Object.keys(Z).forEach((key) => {
       const d = Z[key], c = CAT[d.k]; if (!c || !c.niv || /boss/i.test(String(c.rang || ''))) return;
-      if (zoneFarm() && d.z !== zoneFarm()) return; // V14.76 — zone imposée : je n'y choisis que l'endroit
+      if (zoneFarm() && !dansZoneFarm(d.z)) return; // V14.76 — zone imposée : je n'y choisis que l'endroit
       if (!zoneFarm() && (c.niv < Math.min(N - 10, Math.round((plafondGroupe() || 0) / 3) - 5) || c.niv > (c.rang === 'elite' ? N - 2 : N + 2))) return; // V14.75 — groupes de 3 ennemis de niv. 45-50 compris
       const lieu = { x: Math.round(d.x / d.n), y: Math.round(d.y / d.n), z: d.z };
       if (S.pnjIgnore['zone:esp:' + d.k] > now) return;
@@ -8851,7 +8853,7 @@
       ['meute', 'Taille maximum d’un groupe ennemi', { 1: '1 ennemi', 2: '2 ennemis', 3: '3 ennemis', 4: '4 ennemis', 6: 'Sans limite' }],
       ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'],
       ['nivGroupeMin', 'Niveau total minimum d’un groupe (0 = pas de minimum)'],
-      ['zoneFarm', 'Zone de farm (mode Farm XP)', () => { const o = { '': 'Automatique : la plus rentable' }; try { Object.keys(ZONES).sort().forEach((z) => { o[z] = (NOMS[z] || z); }); } catch (e) {} return o; }],
+      ['zoneFarm', 'Zone de farm (mode Farm XP)', () => { const o = { '': 'Automatique : la plus rentable', 'plaine-grise,tour-du-chef': 'Plaine grise + Tour du chef' }; try { Object.keys(ZONES).sort().forEach((z) => { o[z] = (NOMS[z] || z); }); } catch (e) {} return o; }],
       ['rythme', 'Rythme', { normal: 'Normal (course, actions enchaînées)', calme: 'Calme (marche, 1,5 s par action, pause de 3 min tous les 12 combats)' }],
       ['delai', 'Secondes entre deux actions en combat (0 à 3)']]],
     ['Soins et achats', [
