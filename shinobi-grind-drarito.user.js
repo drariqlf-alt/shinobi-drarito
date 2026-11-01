@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.74.0
+// @version     14.75.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.74-Drarito';
+  const VERSION = 'V14.75-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1317,6 +1317,7 @@
         Object.assign(CFG, { profil: 'ami', brisInutile: 0, venteInutile: 0, fmAuto: 0, points: 'aucun', talents: 0, suivis: '', inspecter: '' }); sauve();
         note('Personnage ' + (d.self.name || '?') + ' : réglages propres à Ciel désactivés (brisage et vente « inutile », forgemagie, placement des points et des talents). Réactivables dans Réglages.');
       }
+      if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
       if (estDrarito() && CFG.drV16 !== 1) { // V14.72 — Drarito : FARM DES GROUPES À SON NIVEAU (mode XP rapide), toujours à pied, coffres mystérieux gardés
         Object.assign(CFG, { drV16: 1, mode: 'xp', meute: 6, evAller: 1, coffreOuvre: 1, coffreHoraire: 1 }); sauve(); S.cibleId = null; S.objTenu = null; gpsArret();
         note('Drarito : FARM — je chasse les groupes d’ennemis de mon niveau qui rapportent le plus d’XP à l’heure, en restant dans la zone tant qu’il y en a (Réglages → mode « Quêtes » pour revenir aux quêtes).');
@@ -1824,6 +1825,12 @@
     };
   }
 
+  // V14.75 — Drarito : un groupe se juge à la SOMME des niveaux de ses ennemis. Le joueur bat sans peine 150 niveaux au total
+  // (ex. 3 × niv. 50 : 3 % de PV perdus) ; l'estimation des chances, trop prudente, rejetait ces groupes et le bot « cherchait » 10 min.
+  function nivGroupe(m) { const ks = especesDe(m) || []; let t = 0, mx = 0; ks.forEach((k) => { const n = (B.especes[k] || CAT[k] || {}).niv || 0; t += n; if (n > mx) mx = n; }); return { t, mx, nb: ks.length }; }
+  const plafondGroupe = () => (estDrarito() ? Number(CFG.nivGroupe) || 0 : 0);
+  const groupeSur = (m) => { const P = plafondGroupe(); if (!P || !S.niveau) return false; const g = nivGroupe(m); return g.t > 0 && g.t <= P && g.mx <= S.niveau + 2; };
+  const groupeInteressant = (m) => { const P = plafondGroupe(); if (!P) return false; const g = nivGroupe(m); return g.t >= 0.6 * P || g.mx >= (S.niveau || 0) - 10; };
   function choisis(espece, nivMin, meuteVoulue, parmi) {
     if (!S.pos || !S.ancre) return null;
     const maintenant = Date.now();
@@ -1834,7 +1841,7 @@
       if (m.down || m.combat || typeof m.x !== 'number' || m.ignore > maintenant) return;
       if (meuteVoulue ? (m.pack ? m.pack.length : 0) < meuteVoulue : (m.pack ? m.pack.length : 0) > (Number(CFG.meute) >= 6 ? 99 : CFG.meute)) return;
       if (espece) { if ((especesDe(m) || []).indexOf(espece) < 0 && String(m.id).indexOf(espece) < 0) return; }
-      else if (nivMin) { const k = chefDe(m), niv = k && (B.especes[k] || CAT[k] || {}).niv; if (!(niv >= nivMin)) return; }
+      else if (nivMin) { const k = chefDe(m), niv = k && (B.especes[k] || CAT[k] || {}).niv; if (!(niv >= nivMin) && !(plafondGroupe() && groupeInteressant(m))) return; }
       else if (CFG.mode === 'farm' ? dist(m, S.ancre) > CFG.rayon : dist(m, S.pos) > CFG.dmax) return;
       const noms = (especesDe(m) || []).map((k) => ((B.especes[k] || CAT[k] || {}).nom || '') + ' ' + k).join(' ');
       if (f && (m.id + ' ' + (m.pack || []).join(' ') + ' ' + noms).toLowerCase().indexOf(f) < 0) return;
@@ -1842,6 +1849,7 @@
       if (aokiriVeut() && !dansAokiri(m)) return; // Drarito — option Aokiri : au Pays de l'Eau tant qu'un coffre ou une quête m'y attend
       if (basNivDrarito() && (espece ? bloqueAppris(m) : !atteignable(m, String(m.id).split('/')[0]))) return; // Drarito — cible derrière un passage impossible ou hors de portée
       const e = estime(m, S.maxHp);
+      const sur = !espece && !(e && e.dejaPerdu) && groupeSur(m); // V14.75 — groupe dans mon budget de niveaux : je l'attaque sans écouter l'estimation trop prudente
       if (e) {
         // Pour une cible de quête, on tente quoi qu'il arrive : c'est le compteur de défaites de la quête qui décide d'arrêter.
         if (espece && S.niveau && e.p < seuil && e.niv > S.niveau + 5) { const cleT = 'tropHaut:' + espece + ':' + S.niveau; if (!S.vus.has(cleT)) { S.vus.add(cleT); note('Cible de quête ' + espece + ' : niveau ' + e.niv + ' pour mon niveau ' + S.niveau + ', ' + Math.round(100 * e.p) + ' % de chances — j’attends d’avoir monté'); } S.espBloq = S.espBloq || {}; S.espBloq[espece] = Date.now() + 1800000; return; }
@@ -1850,9 +1858,9 @@
           S.espBloq = S.espBloq || {}; S.espBloq[espece] = Date.now() + 1200000; return;
         }
         if (espece && e.dejaPerdu && e.p < seuil) { if (!S.vus.has('tropFort:' + espece)) { S.vus.add('tropFort:' + espece); note('Cible de quête ' + espece + ' : déjà perdu contre elle et ' + Math.round(100 * e.p) + ' % de chances seulement — je ne l’attaque plus pour l’instant'); } S.espBloq = S.espBloq || {}; S.espBloq[espece] = Date.now() + 1800000; return; }
-        if (!espece && (e.p < (e.dejaPerdu ? Math.max(seuil, 0.92) : seuil) || (CFG.nivMax > 0 && e.niv > CFG.nivMax))) return; // trop fort, même à pleins PV
-        if (!espece && INTU() && (e.p < 0.97 || e.dejaPerdu || e.perte > 0.5 * Math.max(1, S.maxHp || 1))) return; // V14.38 Intuable : 97 % de chances au moins, jamais plus de la moitié de mes PV en jeu
-        if (!espece && e.theorique && S.niveau && e.niv > S.niveau + (INTU() ? 2 : 6)) return; // jamais combattu et bien au-dessus de moi : trop risqué sur une simple estimation
+        if (!sur && !espece && (e.p < (e.dejaPerdu ? Math.max(seuil, 0.92) : seuil) || (CFG.nivMax > 0 && e.niv > CFG.nivMax))) return; // trop fort, même à pleins PV
+        if (!sur && !espece && INTU() && (e.p < 0.97 || e.dejaPerdu || e.perte > 0.5 * Math.max(1, S.maxHp || 1))) return; // V14.38 Intuable : 97 % de chances au moins, jamais plus de la moitié de mes PV en jeu
+        if (!sur && !espece && e.theorique && S.niveau && e.niv > S.niveau + (INTU() ? 2 : 6)) return; // jamais combattu et bien au-dessus de moi : trop risqué sur une simple estimation
         const dM = dist(m, S.pos), trajet = Number(CFG.sceaux) && S.sceaux && dM > 4500 ? Math.min(dM / S.vitesse, 30 + 1800 / S.vitesse) : dM / S.vitesse; // au-delà de 4 500 px, un sceau fait le trajet
         const neufs = CFG.mode === 'test' && !espece ? (especesDe(m) || []).filter((k, i, t) => t.indexOf(k) === i && aTester(k)).length : 0;
         if (CFG.mode === 'test' && !espece && !neufs) return; // tout y est déjà mesuré
@@ -3612,7 +3620,7 @@
     let best = null;
     Object.keys(Z).forEach((key) => {
       const d = Z[key], c = CAT[d.k]; if (!c || !c.niv || /boss/i.test(String(c.rang || ''))) return;
-      if (c.niv < N - 10 || c.niv > (c.rang === 'elite' ? N - 2 : N + 2)) return;
+      if (c.niv < Math.min(N - 10, Math.round((plafondGroupe() || 0) / 3) - 5) || c.niv > (c.rang === 'elite' ? N - 2 : N + 2)) return; // V14.75 — groupes de 3 ennemis de niv. 45-50 compris
       const lieu = { x: Math.round(d.x / d.n), y: Math.round(d.y / d.n), z: d.z };
       if (S.pnjIgnore['zone:esp:' + d.k] > now) return;
       if ((B.dangers || []).some((g) => g.niv > N + 5 && Math.abs(g.x - lieu.x) < 1500 && Math.abs(g.y - lieu.y) < 1500)) return;
@@ -7406,23 +7414,24 @@
           if (loin && loin !== m1 && loin.score > 1.5 * s1) { m = loin; if (S.loinDit !== loin.id) { S.loinDit = loin.id; note('Plus rentable un peu plus loin : ' + nomMob(loin) + (loin.est ? ' niv.' + loin.est.niv : '') + ' à ' + Math.round(dist(loin, S.pos)) + ' px (' + (loin.score / s1).toFixed(1) + '× l’XP à l’heure d’ici)'); } }
           else m = m1;
         }
-        const faible = CFG.mode !== 'ryo' && CFG.mode !== 'test' && m && m.est && m.est.niv < S.niveau - (estDrarito() ? 10 : 15) ? m : null; // trop de niveaux sous moi : presque rien à y gagner (Drarito : 10)
+        const faible = CFG.mode !== 'ryo' && CFG.mode !== 'test' && m && m.est && (plafondGroupe() ? !groupeInteressant(m) : m.est.niv < S.niveau - 15) ? m : null; // trop de niveaux sous moi : presque rien à y gagner (Drarito : 10)
         if (faible && CFG.mode !== 'farm') m = null;
         // V14.73 — Drarito : toutes les 10 min, si je tape des ennemis nettement sous mon niveau, je regarde s'il existe une meilleure zone et j'y vais
-        if (estDrarito() && CFG.mode === 'xp' && m && m.est && m.est.niv < S.niveau - 6 && !(S.spotRevu > Date.now())) {
+        if (estDrarito() && CFG.mode === 'xp' && m && m.est && nivGroupe(m).t < 0.8 * (plafondGroupe() || 150) && m.est.niv < S.niveau - 6 && !(S.spotRevu > Date.now())) {
           S.spotRevu = Date.now() + 600000; const sp0 = spotCatalogue();
           if (sp0 && sp0.niv >= S.niveau - 4 && dist(sp0.lieu, S.pos) > 2500) { S.spotForce = sp0; m = null; note('Zone plus rentable trouvée : ' + sp0.nom + ' niv.' + sp0.niv + ' (' + sp0.n + ' groupes dans la zone, ~' + court(sp0.xph) + ' XP/h estimés) à ' + Math.round(dist(sp0.lieu, S.pos)) + ' px — j’y vais'); }
         }
         if (!m) { // Rien à ma mesure ici : je vais là où vivent des ennemis de mon niveau, où que ce soit dans le monde (à pied ou par sceau).
           m = S.spotForce ? null : estDrarito() ? choisis(null, Math.max(1, S.niveau - 10)) : (choisis(null, Math.max(1, S.niveau - 14)) || choisis(null, Math.max(1, S.niveau - 25)));
           if (!m && CFG.mode !== 'ryo' && CFG.mode !== 'test' && CFG.mode !== 'farm' && enMonde()) { // V12.16 — rien à mon niveau en vue : je vais là où vit la meilleure espèce connue, plutôt que de taper du niveau 27
-            const sp = S.spotForce || (estDrarito() ? (spotCatalogue() || spotXP()) : spotXP());
+            const sp = S.spotForce || (S.spotVise && Date.now() - S.spotVise.t < 300000 ? S.spotVise : null) || (estDrarito() ? (spotCatalogue() || spotXP()) : spotXP()); // V14.75 — la zone choisie est gardée 5 min (plus de valse entre deux zones)
+            if (sp && !sp.t) { sp.t = Date.now(); S.spotVise = sp; }
             if (sp) {
               const dS = dist(sp.lieu, S.pos), nomS = sp.nom || (B.especes[sp.k] || {}).nom || sp.k, nivS = sp.niv || (B.especes[sp.k] || {}).niv || '?';
               if (S.spotDit !== sp.k) { S.spotDit = sp.k; note('Rien à mon niveau en vue : je vais chez ' + nomS + ' niv.' + nivS + ' (' + (sp.xph ? '~' + court(sp.xph) + ' XP/h estimés, ' + sp.n + ' groupes dans la zone' : court(sp.xpm) + ' XP/min mesurés') + ', ' + Math.round(dS) + ' px)'); }
               if (dS > 4500 && Number(CFG.sceaux) && await voyageSceau(sp.lieu, null)) return;
-              if (dS > 200) { statut('XP → ' + nomS + ' niv.' + nivS + ' · ' + Math.round(dS) + ' px', true); if (gpsLoin(sp.lieu, 'spot:' + sp.k)) return; if (!navigue(sp.lieu)) { stop(); S.spotForce = null; S.pnjIgnore['zone:esp:' + sp.k] = Date.now() + 1800000; } return; }
-              S.spotForce = null; S.pnjIgnore['zone:esp:' + sp.k] = Date.now() + 600000; // sur place et personne : un autre endroit la prochaine fois
+              if (dS > 200) { statut('XP → ' + nomS + ' niv.' + nivS + ' · ' + Math.round(dS) + ' px', true); if (gpsLoin(sp.lieu, 'spot:' + sp.k)) return; if (!navigue(sp.lieu)) { stop(); S.spotForce = null; S.spotVise = null; S.pnjIgnore['zone:esp:' + sp.k] = Date.now() + 1800000; } return; }
+              S.spotForce = null; S.spotVise = null; S.pnjIgnore['zone:esp:' + sp.k] = Date.now() + 600000; // sur place et personne : un autre endroit la prochaine fois
             }
           }
           if (!m && (!faible || (faible.est && faible.est.niv < S.niveau - 25)) && lanceExpedition()) return; // V14.65 — que des ennemis bien trop faibles et des quêtes « trop loin » : expédition
@@ -7807,6 +7816,8 @@
       if (!N.route && mnt - N.envoiT < 6000) return true; // j'attends l'itinéraire
       if (N.essais >= (/^loin:/.test(String(cle)) ? 3 : 6)) { /* V14.71 — long trajet : 3 essais au plus avant de prendre mon propre chemin */ N.refus = N.route ? 'bloqué sur place' : 'pas d’itinéraire'; N.refusT = mnt; note('GPS du jeu : ' + N.refus + ' vers ' + cle + ' — je prends mon propre chemin'); return false; }
     }
+    if (mnt - (S.gpsEnvoiT || 0) < 5000) return true; // V14.75 — jamais plus d'une demande d'itinéraire toutes les 5 s (le jeu répondait « rate_limited »)
+    S.gpsEnvoiT = mnt;
     if (S.marche) stop();
     const essais = N ? N.essais : 0;
     S.gps = { cle, to, essais: essais + 1, envoiT: mnt, immobileT: mnt, pos: S.pos ? { x: S.pos.x, y: S.pos.y } : null, carte: S.mapId, route: null, fin: null, refus: null };
@@ -7840,6 +7851,7 @@
       if (!N.dit) { N.dit = 1; note('GPS du jeu : en route vers ' + ((d.to && d.to.name) || N.cle) + ' · ' + (d.legs || []).length + ' étape(s) · environ ' + Math.round((d.estimateSeconds || 0) / 60) + ' min'); }
     } else if (ev === 'navigation.refused') {
       N.refus = d.code || 'refus'; N.refusT = Date.now();
+      if (d.code === 'rate_limited') S.gpsHS = Date.now() + 900000; // V14.75 — trop de demandes : GPS laissé 15 min
       if (d.code === 'in_combat' || d.code === 'rate_limited') { N.refus = null; N.envoiT = Date.now() + 4000; N.essais = Math.max(0, N.essais - 1); }
       else note('GPS du jeu refusé (' + (d.code || '?') + (d.message ? ' : ' + d.message : '') + ') vers ' + N.cle);
     }
@@ -8827,6 +8839,7 @@
     ['Combat', [
       ['seuil', 'Chances de victoire minimum (%)'],
       ['meute', 'Taille maximum d’un groupe ennemi', { 1: '1 ennemi', 2: '2 ennemis', 3: '3 ennemis', 4: '4 ennemis', 6: 'Sans limite' }],
+      ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'],
       ['rythme', 'Rythme', { normal: 'Normal (course, actions enchaînées)', calme: 'Calme (marche, 1,5 s par action, pause de 3 min tous les 12 combats)' }],
       ['delai', 'Secondes entre deux actions en combat (0 à 3)']]],
     ['Soins et achats', [
@@ -8928,7 +8941,7 @@
   }
   function corpsCombat() {
     const z = el('div');
-    blocReg(z, 'Choix des combats', [['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt'], ['seuil', 'Chances de victoire minimum (%)'], ['meute', 'Taille maximum d’un groupe ennemi'], ['allies', 'Combats de mon groupe'], ['specFerme', 'Fermer les spectateurs à chaque combat'], ['coffreOuvre', 'Ouvrir les coffres mystérieux']]);
+    blocReg(z, 'Choix des combats', [['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt'], ['seuil', 'Chances de victoire minimum (%)'], ['meute', 'Taille maximum d’un groupe ennemi'], ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'], ['allies', 'Combats de mon groupe'], ['specFerme', 'Fermer les spectateurs à chaque combat'], ['coffreOuvre', 'Ouvrir les coffres mystérieux']]);
     blocReg(z, 'Soins', [['soinEntre', 'Entre deux combats, se soigner sous'], ['achatSoins', 'Racheter des soins quand il en manque']], 'Contre un boss en groupe, Ciel joue soigneur : les alliés blessés passent avant ses coups.');
     blocReg(z, 'Sorts', [['testTout', 'Tester chaque sort pour garder les meilleurs'], ['sansPhys', 'Retirer les techniques physiques (Force)'], ['suivis', 'Joueurs suivis dans les rapports']]);
     blocReg(z, 'Rythme', [['rythme', 'Rythme'], ['delai', 'Secondes entre deux actions (0 à 3)']]);
