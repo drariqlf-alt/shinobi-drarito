@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.78.0
+// @version     14.79.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.78-Drarito';
+  const VERSION = 'V14.79-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1839,6 +1839,45 @@
   const groupeInteressant = (m) => { const P = plafondGroupe(); if (!P) return false; const g = nivGroupe(m), mn = Number(CFG.nivGroupeMin) || 0; return mn ? g.t >= mn : (g.t >= 0.6 * P || g.mx >= (S.niveau || 0) - 10); };
   const zoneFarm = () => (estDrarito() && CFG.mode === 'xp' && CFG.zoneFarm ? String(CFG.zoneFarm) : ''); // V14.76 — zone(s) de farm imposée(s), séparées par des virgules
   const dansZoneFarm = (z) => zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).indexOf(String(z)) >= 0;
+  // V14.79 — un groupe « de ma zone » : soit son identifiant porte le nom de la zone, soit ses espèces sont celles de mes zones et il est
+  // dans les environs (les groupes autour d'Amegakure portent un autre nom de zone que « plaine-grise » : il les ignorait tous).
+  function especesZonesFarm() { const cle = zoneFarm(); if (S.ezf && S.ezf.cle === cle) return S.ezf.set; const set = new Set(); cle.split(',').map((x) => x.trim()).forEach((z) => { const Z = ZONES[z]; if (!Z || !Z.m) return; Object.keys(Z.m).forEach((mk) => set.add(mk.slice(z.length + 1).replace(/-\d+$/, ''))); }); S.ezf = { cle, set }; return set; }
+  function groupeDeMaZone(m) {
+    if (dansZoneFarm(String(m.id).split('/')[0])) return true;
+    const set = especesZonesFarm(), ks = especesDe(m) || [chefDe(m)].filter(Boolean);
+    return ks.length > 0 && ks.every((k) => set.has(k)) && distZonesFarm(m) < 9000;
+  }
+  // V14.79 — FARM DE ZONE, CHOIX DIRECT : tout groupe visible de mes zones dont la somme des niveaux est entre le minimum et le maximum
+  // réglés (150-250), le plus gros et le plus proche d'abord. Pas d'estimation de chances (trop prudente), pas de catalogue obligatoire :
+  // une espèce absente du catalogue prend le niveau du chef. Si rien ne convient alors que des groupes sont là, j'écris pourquoi dans le journal.
+  function nivGroupe2(m) {
+    const chef = chefDe(m), ks = (chef ? [chef] : []).concat(Array.isArray(m.pack) ? m.pack : []);
+    const lv = (k) => (B.especes[k] || CAT[k] || {}).niv || 0, lc = chef ? lv(chef) : 0;
+    let t = 0, mx = 0; ks.forEach((k) => { const n = lv(k) || lc; t += n; mx = Math.max(mx, n); });
+    return { t, mx, nb: ks.length, ks };
+  }
+  function choisisZone() {
+    if (!S.pos) return null;
+    const now = Date.now(), mn = Number(CFG.nivGroupeMin) || 0, mxT = Number(CFG.nivGroupe) || 9999, motifs = [];
+    let best = null;
+    S.mobs.forEach((m) => {
+      if (typeof m.x !== 'number') return;
+      const d = dist(m, S.pos); if (d > 4000) return;
+      const g = nivGroupe2(m), nom = String(m.id).split('/').pop();
+      const non = (r) => { if (d < 1600 && motifs.length < 8) motifs.push(nom + ' ×' + g.nb + ' (' + g.t + ') : ' + r); };
+      if (m.down) return; if (m.combat) return non('déjà en combat'); if (m.ignore > now) return non('laissé de côté');
+      if (!groupeDeMaZone(m) && distZonesFarm(m) > 9000) return non('hors zone');
+      if (!g.t) return non('niveau inconnu');
+      if (g.t < mn) return non('trop faible');
+      if (g.t > mxT) return non('trop fort');
+      if (g.ks.some((k) => (B.especes[k] || {}).defaites > 0 && (B.especes[k] || {}).defaites >= (B.especes[k] || {}).n)) return non('déjà perdu contre eux');
+      const sc = g.t / (d / (S.vitesse || 220) + 25);
+      if (!best || sc > best.sc) best = { m, sc };
+    });
+    if (best) { const m = best.m; m.est = estime(m, S.maxHp) || null; m.score = best.sc; return m; }
+    if (motifs.length && (!S.zoneDiagT || now - S.zoneDiagT > 120000)) { S.zoneDiagT = now; note('Farm de zone — groupes vus mais refusés : ' + motifs.join(' | ')); }
+    return null;
+  }
   function choisis(espece, nivMin, meuteVoulue, parmi) {
     if (!S.pos || !S.ancre) return null;
     const maintenant = Date.now();
@@ -1854,7 +1893,7 @@
       const noms = (especesDe(m) || []).map((k) => ((B.especes[k] || CAT[k] || {}).nom || '') + ' ' + k).join(' ');
       if (f && (m.id + ' ' + (m.pack || []).join(' ') + ' ' + noms).toLowerCase().indexOf(f) < 0) return;
       if (estDrarito() && zoneInterdite(m)) return; // Drarito — coin où je n'arrive pas à aller
-      if (!espece && zoneFarm() && !dansZoneFarm(String(m.id).split('/')[0])) return; // V14.76 — seulement les groupes de la zone de farm
+      if (!espece && zoneFarm() && !groupeDeMaZone(m)) return; // V14.76 — seulement les groupes de la zone de farm
       if (!espece && zoneFarm() && Number(CFG.nivGroupeMin) && !groupeInteressant(m)) return; // V14.76 — groupe sous la borne basse : rien à y gagner
       if (!espece && zoneFarm() && plafondGroupe() && nivGroupe(m).t > plafondGroupe()) return; // V14.76 — au-dessus de la borne haute : jamais
       if (aokiriVeut() && !dansAokiri(m)) return; // Drarito — option Aokiri : au Pays de l'Eau tant qu'un coffre ou une quête m'y attend
@@ -7423,8 +7462,9 @@
           const reste = Object.keys(CAT).filter((k) => aTester(k)).length;
           if (S.testReste !== reste) { S.testReste = reste; statut('Test du bestiaire : ' + reste + ' espèces jamais battues dans le catalogue', true); }
         }
+        else if (zoneFarm()) m = choisisZone(); // V14.79 — zones de farm imposées : choix simple et direct par niveau total du groupe
         else m = CFG.mode === 'ryo' ? choisis(null, 1) : choisis(); // ryōs : le meilleur gain à la seconde, où qu'il soit dans le monde
-        if (m && CFG.mode !== 'ryo' && CFG.mode !== 'test' && CFG.mode !== 'farm' && m.score > 0) { // V12.16 — une cible plus loin (trajet compté) qui rapporte nettement plus à l'heure
+        if (m && !zoneFarm() && CFG.mode !== 'ryo' && CFG.mode !== 'test' && CFG.mode !== 'farm' && m.score > 0) { // V12.16 — une cible plus loin (trajet compté) qui rapporte nettement plus à l'heure
           const s1 = m.score, m1 = m, loin = choisis(null, Math.max(1, S.niveau - 14));
           if (loin && loin !== m1 && loin.score > 1.5 * s1) { m = loin; if (S.loinDit !== loin.id) { S.loinDit = loin.id; note('Plus rentable un peu plus loin : ' + nomMob(loin) + (loin.est ? ' niv.' + loin.est.niv : '') + ' à ' + Math.round(dist(loin, S.pos)) + ' px (' + (loin.score / s1).toFixed(1) + '× l’XP à l’heure d’ici)'); } }
           else m = m1;
@@ -7437,7 +7477,7 @@
           if (sp0 && sp0.niv >= S.niveau - 4 && dist(sp0.lieu, S.pos) > 2500) { S.spotForce = sp0; m = null; note('Zone plus rentable trouvée : ' + sp0.nom + ' niv.' + sp0.niv + ' (' + sp0.n + ' groupes dans la zone, ~' + court(sp0.xph) + ' XP/h estimés) à ' + Math.round(dist(sp0.lieu, S.pos)) + ' px — j’y vais'); }
         }
         if (!m) { // Rien à ma mesure ici : je vais là où vivent des ennemis de mon niveau, où que ce soit dans le monde (à pied ou par sceau).
-          m = S.spotForce ? null : estDrarito() ? choisis(null, Math.max(1, S.niveau - 10)) : (choisis(null, Math.max(1, S.niveau - 14)) || choisis(null, Math.max(1, S.niveau - 25)));
+          m = S.spotForce || zoneFarm() ? null : estDrarito() ? choisis(null, Math.max(1, S.niveau - 10)) : (choisis(null, Math.max(1, S.niveau - 14)) || choisis(null, Math.max(1, S.niveau - 25)));
           if (!m && CFG.mode !== 'ryo' && CFG.mode !== 'test' && CFG.mode !== 'farm' && enMonde()) { // V12.16 — rien à mon niveau en vue : je vais là où vit la meilleure espèce connue, plutôt que de taper du niveau 27
             const sp = S.spotForce || (S.spotVise && Date.now() - S.spotVise.t < 300000 ? S.spotVise : null) || (estDrarito() ? (spotCatalogue() || spotXP()) : spotXP()); // V14.75 — la zone choisie est gardée 5 min (plus de valse entre deux zones)
             if (sp && !sp.t) { sp.t = Date.now(); S.spotVise = sp; }
@@ -7450,7 +7490,7 @@
             }
           }
           if (!m && (!faible || (faible.est && faible.est.niv < S.niveau - 25)) && lanceExpedition()) return; // V14.65 — que des ennemis bien trop faibles et des quêtes « trop loin » : expédition
-          if (!m) m = faible || choisis(null, 1);
+          if (!m && !zoneFarm()) m = faible || choisis(null, 1); // V14.79 — farm de zone : jamais de cible hors des règles, j'attends la réapparition
           if (m && S.loinDit !== m.id && dist(m, S.pos) > 1500) { S.loinDit = m.id; note('Pas de quête faisable pour l’instant : je chasse ce qui rapporte le plus d’XP à l’heure — ' + nomMob(m) + (m.est ? ' niv.' + m.est.niv : '') + ' à ' + Math.round(dist(m, S.pos)) + ' px'); }
         }
       }
@@ -7462,7 +7502,7 @@
       // Assez de PV ? Ennemi connu : chances estimées avec les PV actuels. Inconnu : presque pleins PV.
       const mini = (Math.max(Number(CFG.pvMin) || 0, INTU() ? 95 : 0) * S.maxHp) / 100;
       const deQuete = S.pourQuete && S.pourQuete.id === m.id;
-      const maintenantOk = deQuete ? (S.hp >= 0.9 * S.maxHp || (!!m.est && (estime(m, S.hp) || { p: 0 }).p >= CFG.seuil / 100)) : m.est ? (estime(m, S.hp) || { p: 0 }).p >= CFG.seuil / 100 : S.hp >= 0.95 * S.maxHp;
+      const maintenantOk = zoneFarm() && !deQuete ? S.hp >= 0.7 * S.maxHp /* V14.79 — farm de zone : j'attaque dès 70 % de PV (l'estimation me faisait attendre indéfiniment) */ : deQuete ? (S.hp >= 0.9 * S.maxHp || (!!m.est && (estime(m, S.hp) || { p: 0 }).p >= CFG.seuil / 100)) : m.est ? (estime(m, S.hp) || { p: 0 }).p >= CFG.seuil / 100 : S.hp >= 0.95 * S.maxHp;
       if (S.hp < mini || !maintenantOk) {
         stop();
         if (Number(CFG.soin) && await soigne()) return;
@@ -7822,6 +7862,7 @@
   // le serveur répond par un itinéraire complet (navigation.route, sur plusieurs continents si besoin, portes comprises) et le pilote
   // automatique du jeu marche tout seul. Le bot ne touche plus aux touches pendant ce temps : il surveille seulement qu'on avance.
   function gpsVers(to, cle) { // true = en route (ne rien faire d'autre), false = impossible par le GPS (refus ou aucun progrès)
+    if (estDrarito()) return false; // V14.79 — Drarito : le GPS du jeu ne fait pas avancer son personnage (itinéraires renvoyés en boucle) : toujours mon propre chemin
     const mnt = Date.now();
     let N = S.gps && S.gps.cle === cle ? S.gps : null;
     if (N && N.refus) return mnt - N.refusT < 60000 ? false : (N = null, gpsVers(to, cle));
