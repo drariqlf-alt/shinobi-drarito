@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.77.0
+// @version     14.78.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.77-Drarito';
+  const VERSION = 'V14.78-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -703,7 +703,7 @@
   const signature = (ev, c) => ev + (c && c.action ? ':' + c.action.type + ':' + (c.action.skillId || '') : '');
   const ENVOI = { dernier: 0, sig: '', bannis: new Set(), silence: 0 };
   const envoie = (ev, corps) => {
-    if (ev === 'teleport.remote' && !Number(CFG.sceaux) && S.self && S.self.name === 'Drarito') { if (!S.tpRefusDit) { S.tpRefusDit = 1; note('Sceaux désactivés : pas de téléportation, j’y vais à pied'); } return false; } // V14.66
+    if (ev === 'teleport.remote' && !Number(CFG.sceaux) && !S.tpZone && S.self && S.self.name === 'Drarito') { if (!S.tpRefusDit) { S.tpRefusDit = 1; note('Sceaux désactivés : pas de téléportation, j’y vais à pied'); } return false; } // V14.66
     if (MORT_PERSO || !S.sock || S.sock.readyState !== 1 || Date.now() < ENVOI.silence) return false;
     const format = FORMATS[ev];
     let propre = null;
@@ -2609,7 +2609,7 @@
   }
   function navigue(but0) {
     if (but0 && typeof but0.x === 'number') S.navBut = { x: but0.x, y: but0.y, t: Date.now() }; // Drarito — le but final, retenu pour le déblocage
-    { const pv = but0 && typeof but0.x === 'number' && porteVillage(but0); if (pv) { if (S.porteDite !== pv.x + ',' + pv.y) { S.porteDite = pv.x + ',' + pv.y; note('Village : je passe par la porte ' + Math.round(pv.x) + ',' + Math.round(pv.y)); } but0 = Object.assign({}, but0, { x: pv.x, y: pv.y }); } } // V14.62 — par la porte du village
+    { let pv = but0 && typeof but0.x === 'number' && porteVillage(but0); const pf = S.porteFixe; if (pv && pf && Date.now() - pf.t < 30000 && dist(pf.but, but0) < 600) pv = pf.p; else if (pv) S.porteFixe = { p: pv, but: { x: but0.x, y: but0.y }, t: Date.now() }; /* V14.78 — une porte choisie est gardée 30 s (il alternait entre deux portes de Kumo) */ if (pv) { if (S.porteDite !== pv.x + ',' + pv.y) { S.porteDite = pv.x + ',' + pv.y; note('Village : je passe par la porte ' + Math.round(pv.x) + ',' + Math.round(pv.y)); } but0 = Object.assign({}, but0, { x: pv.x, y: pv.y }); } } // V14.62 — par la porte du village
     rafraichit();
     const maintenant = Date.now();
     if (NAV.parFleche && maintenant - NAV.parFleche.t < 12000 && dist(NAV.parFleche.but, but0) < 250) { // je contourne en suivant la flèche du jeu
@@ -3212,6 +3212,7 @@
     return false;
   }
   async function rappel(but, npcId) {
+    if (zoneFarm()) return false; // V14.78 — farm fixé : le parchemin renvoyait à Kumo, à l'autre bout de la carte
     if (!Number(CFG.rappel) || !enMonde() || Date.now() < (S.rappelA || 0)) return false;
     const r = B.rappel || {};
     if (r.ko) return false;
@@ -6258,6 +6259,7 @@
     if ((seuil < 0 && Number(CFG.venteInutile) !== 1) || S.combat || !enMonde() || (now < (S.vcA || 0) && sig === S.vcSig) || !S.equip) return false;
     S.vcSig = sig; // le coffre, le sac ou les couleurs connues ont changé : je regarde tout de suite
     if (seuil >= 0 && !Object.keys(RAR).length && Number(CFG.venteInutile) !== 1) { S.vcA = now + 20000; return false; }
+    if (estDrarito() && zoneFarm()) return false; // V14.78 — farm fixé : jamais de tournée de vente hors de la zone (rien n'est vendable de toute façon tant que les couleurs sont inconnues)
     if (estDrarito()) { // Drarito — tournée de vente dès que le sac est presque plein, et je vends tout ce qui peut l'être avant de reprendre
       const libre0 = (S.invCap || 60) - S.inv.filter((x) => x && x.itemId).length;
       if (!S.drVente && libre0 > 15) return false;
@@ -7144,6 +7146,7 @@
         ids.forEach((id, i) => setTimeout(() => { try { envoie('player.inspect', { playerId: id }); } catch (e) {} }, 1500 * (i + 1)));
       }
       if (await retourApresCoffre()) return; // V14.40 — coffre ouvert : je rentre à mon farm
+      if (await retourZone()) return; // V14.78 — hors de mes zones de farm : j'y retourne (sceau de la zone si je l'ai)
       if ((CFG.mode === 'tresor' || coffreHoraire()) && await sceauCoffres()) return; // V14.33 — une fois par heure : un sceau vers le coffre le plus proche d'un sceau
       if (await allerEvent()) return; // V14.1 — événement à rejoindre
       if (await allerAokiri()) return; // V14.55 — option Aokiri : je rejoins le Pays de l'Eau
@@ -7221,7 +7224,7 @@
         return;
       }
       sauveCarte();
-      if (Number(CFG.sceaux) && enMonde() && (!S.sceauxT || Date.now() - S.sceauxT > 600000) && !S.combat && !(S.sceauxDem > Date.now() - 120000)) { S.sceauxDem = Date.now(); envoie('teleport.network.request', {}); }
+      if ((Number(CFG.sceaux) || zoneFarm()) && enMonde() && (!S.sceauxT || Date.now() - S.sceauxT > 600000) && !S.combat && !(S.sceauxDem > Date.now() - 120000)) { S.sceauxDem = Date.now(); envoie('teleport.network.request', {}); }
       if (S.zonesSales) { S.zonesSales = false; sauveB(); }
       let m = null;
       if (enMonde()) litIndications();
@@ -8222,7 +8225,7 @@
       const sp0 = estDrarito() && sceauProche(); // V14.61 — Drarito : le sceau le plus proche d'abord (le parchemin le renvoyait à Kuma, à l'autre bout de la carte)
       if (sp0 && !S.combat && enMonde() && (S.ryo == null || sp0.cost <= S.ryo)) { stop(); gpsArret(); envoie('teleport.remote', { destinationId: sp0.id }); S.tpA = Date.now() + 60000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : sceau « ' + (sp0.name || sp0.id) + ' » pour sortir de ce coin'; note(quoi + ' (' + pourquoi + ')'); return quoi; }
       const slot = S.inv.find((x) => x && x.itemId === 'parchemin-de-rappel' && x.quantity > 0);
-      if (slot && !S.combat && enMonde()) { stop(); envoie('inventory.use', { index: slot.index }); S.rappelA = Date.now() + 90000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : parchemin de rappel'; }
+      if (slot && !zoneFarm() && !S.combat && enMonde()) { stop(); envoie('inventory.use', { index: slot.index }); S.rappelA = Date.now() + 90000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : parchemin de rappel'; }
       else {
         const sp = estDrarito() && sceauProche(); // Drarito — pas de parchemin : le sceau découvert le plus proche me sort du coin où je tourne
         if (sp && !S.combat && enMonde() && (S.ryo == null || sp.cost <= S.ryo)) { stop(); gpsArret(); envoie('teleport.remote', { destinationId: sp.id }); S.tpA = Date.now() + 60000; NAV.route = []; NAV.but = null; NAV.prog = null; quoi = 'Déblocage 2/3 : sceau « ' + (sp.name || sp.id) + ' » pour sortir de ce coin'; }
@@ -8619,7 +8622,26 @@
   }
   // Drarito — sous le niveau 15, pas de traversée du continent pour un coffre ou un événement : seulement ceux à moins de 6 000 px (environ 35 s de marche).
   // Les coffres lointains ne bloquent plus les quêtes (prologue d'Iruka compris).
+  // V14.78 — ZONES DE FARM STRICTES : si je me retrouve loin de mes zones (téléporté, poussé, rappel), j'y retourne aussitôt,
+  // par le sceau de la zone quand je l'ai découvert (même avec les sceaux coupés : c'est le seul voyage autorisé), sinon à pied.
+  function rectZone(z) { const o = origineZone(z), Z = ZONES[z]; if (!o || !Z) return null; return { x0: o.x, y0: o.y, x1: o.x + (Z.w || 0) * 32, y1: o.y + (Z.h || 0) * 32 }; }
+  function distZonesFarm(p) { let d = Infinity; zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).forEach((z) => { const r = rectZone(z); if (!r) return; const dx = Math.max(r.x0 - p.x, 0, p.x - r.x1), dy = Math.max(r.y0 - p.y, 0, p.y - r.y1); d = Math.min(d, Math.hypot(dx, dy)); }); return d; }
+  async function retourZone() {
+    if (!zoneFarm() || S.combat || !enMonde() || !S.pos) return false;
+    const now = Date.now(), d = distZonesFarm(S.pos);
+    if (!(d > 6000) || now < (S.tpA || 0)) return false;
+    const ids = zoneFarm().split(',').map((x) => 'sceau-' + x.trim());
+    const sc = (S.sceaux || []).find((x) => x.discovered && ids.indexOf(x.id) >= 0 && (S.ryo == null || x.cost == null || x.cost <= S.ryo));
+    if (!sc) { if (!S.retourDit || now - S.retourDit > 300000) { S.retourDit = now; note('Hors de mes zones de farm (' + Math.round(d) + ' px) : j’y retourne à pied (aucun sceau découvert dans ces zones)'); } return false; }
+    stop(); gpsArret(); S.tpA = now + 60000; S.cibleId = null; S.spotVise = null;
+    note('Hors de mes zones de farm (' + Math.round(d) + ' px) : retour par le ' + (sc.name || sc.id));
+    S.tpZone = true; try { envoie('teleport.remote', { destinationId: sc.id }); } finally { S.tpZone = false; }
+    await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 4000);
+    await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
+    return true;
+  }
   function evTropLoin(x) {
+    if (x && zoneFarm()) return !dansZoneFarm(x.zoneId || String(x.zone || '').replace(/ /g, '-')); // V14.78 — farm fixé : seulement les coffres DANS mes zones
     if (x && aokiriOn()) return !dansAokiri(x); // Drarito — option Aokiri : tous les coffres du Pays de l'Eau, aucun ailleurs
     if (!x || !basNivDrarito()) return false;
     if (!S.pos) return true; // position inconnue (changement de carte, reconnexion) : prudence
