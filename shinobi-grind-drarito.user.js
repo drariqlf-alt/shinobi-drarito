@@ -6454,7 +6454,7 @@
   // V14.55 — Drarito : option « Aokiri » (Réglages). Je reste au Pays de l'Eau (Aokiri) : j'y ouvre les coffres mystérieux dès que le jeu
   // en permet un (un par heure, règle du jeu), et entre deux coffres je farme les groupes de monstres de la région, en attendant leur retour.
   // V14.60 — Drarito : une zone où je n'arrive pas à aller est interdite 20 min (cibles, coins de chasse, PNJ dedans) : je ne retourne pas buter dessus.
-  function bloqueZoneDrarito(p, pourquoi) {
+  function bloqueZoneDrarito(p, pourquoi) { S.spotVise = null; S.spotForce = null; /* V14.80 — zone visée oubliée */
     try {
       const now = Date.now(); S.zonesKO = (S.zonesKO || []).filter((z) => z.fin > now);
       S.zonesKO.push({ x: p.x, y: p.y, r: 1500, fin: now + 1200000 }); retiensBarriere(p);
