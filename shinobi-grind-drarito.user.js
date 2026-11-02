@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.81.0
+// @version     14.82.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.81-Drarito';
+  const VERSION = 'V14.82-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1867,6 +1867,7 @@
       const g = nivGroupe2(m), nom = String(m.id).split('/').pop();
       const non = (r) => { if (d < 1600 && motifs.length < 8) motifs.push(nom + ' ×' + g.nb + ' (' + g.t + ') : ' + r); };
       if (m.down) return; if (m.combat) return non('déjà en combat'); if (m.ignore > now) return non('laissé de côté');
+      if (/bijuu|-lair$/.test(String(m.id)) || /boss/i.test(String((CAT[chefDe(m)] || {}).rang || ''))) return non('boss ou bijū'); // V14.82
       if (!groupeDeMaZone(m) && distZonesFarm(m) > 9000) return non('hors zone');
       if (!g.t) return non('niveau inconnu');
       if (g.t < mn) return non('trop faible');
@@ -8542,6 +8543,11 @@
     cfg: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
     log: '<svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
   };
+  // V14.82 — FARMS DE ZONE PRÊTS À L'EMPLOI (cartes du choix des modes) : zones imposées + bornes du total de niveaux des groupes
+  const PRESETS_FARM = {
+    'farm-tourbillon': { zoneFarm: 'rivage-d-uzushio,ruines-du-clan-uzumaki,grand-tourbillon', nivGroupeMin: 240, nivGroupe: 480 },
+    'farm-pluie': { zoneFarm: 'plaine-grise,tour-du-chef', nivGroupeMin: 150, nivGroupe: 250 },
+  };
   const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', groupe: 'AFK groupe' };
   const court = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e4 ? Math.round(n / 1000) + ' k' : String(Math.round(n)));
   let ui = null;
@@ -8675,7 +8681,7 @@
     const now = Date.now(), d = distZonesFarm(S.pos);
     if (!(d > 6000) || now < (S.tpA || 0)) return false;
     const ids = zoneFarm().split(',').map((x) => 'sceau-' + x.trim());
-    const sc = (S.sceaux || []).find((x) => x.discovered && ids.indexOf(x.id) >= 0 && (S.ryo == null || x.cost == null || x.cost <= S.ryo));
+    const sc = (S.sceaux || []).find((x) => x.discovered && (ids.indexOf(x.id) >= 0 || dansZoneFarm(x.mapId)) && (S.ryo == null || x.cost == null || x.cost <= S.ryo)); // V14.82 — aussi le sceau dont la carte est l'une de mes zones (sceau-uzushio…)
     if (!sc) { if (!S.retourDit || now - S.retourDit > 300000) { S.retourDit = now; note('Hors de mes zones de farm (' + Math.round(d) + ' px) : j’y retourne à pied (aucun sceau découvert dans ces zones)'); } return false; }
     stop(); gpsArret(); S.tpA = now + 60000; S.cibleId = null; S.spotVise = null;
     note('Hors de mes zones de farm (' + Math.round(d) + ' px) : retour par le ' + (sc.name || sc.id));
@@ -8919,7 +8925,7 @@
       ['meute', 'Taille maximum d’un groupe ennemi', { 1: '1 ennemi', 2: '2 ennemis', 3: '3 ennemis', 4: '4 ennemis', 6: 'Sans limite' }],
       ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'],
       ['nivGroupeMin', 'Niveau total minimum d’un groupe (0 = pas de minimum)'],
-      ['zoneFarm', 'Zone de farm (mode Farm XP)', () => { const o = { '': 'Automatique : la plus rentable', 'plaine-grise,tour-du-chef': 'Plaine grise + Tour du chef' }; try { Object.keys(ZONES).sort().forEach((z) => { o[z] = (NOMS[z] || z); }); } catch (e) {} return o; }],
+      ['zoneFarm', 'Zone de farm (mode Farm XP)', () => { const o = { '': 'Automatique : la plus rentable', 'plaine-grise,tour-du-chef': 'Plaine grise + Tour du chef', 'rivage-d-uzushio,ruines-du-clan-uzumaki,grand-tourbillon': 'Île du Tourbillon (Uzushio)' }; try { Object.keys(ZONES).sort().forEach((z) => { o[z] = (NOMS[z] || z); }); } catch (e) {} return o; }],
       ['rythme', 'Rythme', { normal: 'Normal (course, actions enchaînées)', calme: 'Calme (marche, 1,5 s par action, pause de 3 min tous les 12 combats)' }],
       ['delai', 'Secondes entre deux actions en combat (0 à 3)']]],
     ['Soins et achats', [
@@ -8985,15 +8991,15 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 240 à 480 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
-    CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { CFG.mode = k; sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
+    CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { if (PRESETS_FARM[k]) { Object.assign(CFG, PRESETS_FARM[k], { mode: 'xp', farmPreset: k }); S.spotVise = null; S.spotForce = null; S.ezf = null; } else { CFG.mode = k; CFG.farmPreset = ''; if (k === 'xp') CFG.zoneFarm = ''; } sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
     z.append(grille);
     const ctx = el('div'); z.append(ctx);
     let quetes = null;
     function dessine() {
-      Object.keys(cb).forEach((k) => cb[k].classList.toggle('a', CFG.mode === k));
+      Object.keys(cb).forEach((k) => cb[k].classList.toggle('a', PRESETS_FARM[k] ? CFG.mode === 'xp' && CFG.farmPreset === k : CFG.mode === k && !(k === 'xp' && CFG.farmPreset)));
       ctx.textContent = ''; quetes = null;
       if (CFG.mode === 'boss') blocReg(ctx, 'Boss', [['boss', 'Boss visé']], 'Le bot attend sur place qu’il réapparaisse, et se soigne à 97 % avant d’engager.');
       else if (CFG.mode === 'donjons') { blocReg(ctx, 'Donjons', [['djChoisi', 'Donjon à enchaîner'], ['djMarge', 'Niveaux d’avance voulus sur le donjon'], ['djSinon', 'Si aucun donjon n’est faisable']]);
