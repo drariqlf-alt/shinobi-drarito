@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.82.0
+// @version     14.83.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.82-Drarito';
+  const VERSION = 'V14.83-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1324,6 +1324,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV21 !== 1) { CFG.drV21 = 1; CFG.points = 'cauchemar'; S.depenseKO = 0; sauve(); note('Drarito : plan de points « Cauchemar » — Esprit 300, puis Katon 200 (vos sorts de feu : Fournaise, Lance, Explosion, Trait), puis Vitalité. Pour redistribuer les points déjà placés : « Refaire sa feuille » en jeu (gratuit), le bot replace tout seul.'); } // V14.83
       if (estDrarito() && CFG.drV20 !== 1) { CFG.drV20 = 1; CFG.drV17 = 1; Object.assign(CFG, { nivGroupe: 250, nivGroupeMin: 150 }); sauve(); note('Drarito : bornes des groupes remises à 150-250 niveaux au total (un ancien réglage à 150 écrasait le maximum)'); } // V14.80
       if (estDrarito() && CFG.drV16 !== 1) { // V14.72 — Drarito : FARM DES GROUPES À SON NIVEAU (mode XP rapide), toujours à pied, coffres mystérieux gardés
         Object.assign(CFG, { drV16: 1, mode: 'xp', meute: 6, evAller: 1, coffreOuvre: 1, coffreHoraire: 1 }); sauve(); S.cibleId = null; S.objTenu = null; gpsArret();
@@ -5491,7 +5492,9 @@
     if (S.v5 && S.voie === 'kenjutsu' && String(CFG.points).trim().toLowerCase() === 'senju') { CFG.points = 'fer'; sauve(); note('Points : vous êtes passé Kenjutsu — plan « senju » (Esprit) remplacé par « fer » : Physique 375, puis Vitalité'); }
     { const voulu = { kenjutsu: 'fer', medical: 'senju', genjutsu: 'esprit' }[S.voie], actuel = String(CFG.points).trim().toLowerCase(); // V14.17 — changement de voie : le plan suit
       if (S.v5 && voulu && /^(fer|fersurvie|senju|esprit|suiton)$/.test(actuel) && !(voulu === 'fer' && actuel === 'fersurvie') && !(voulu === 'senju' && actuel === 'esprit') && actuel !== voulu) { CFG.points = voulu; sauve(); note('Points : voie ' + S.voie + ' — plan « ' + actuel + ' » remplacé par « ' + voulu + ' »'); } }
-    const nomPlan = String(CFG.points).trim().toLowerCase(), PLAN_FIXE = { senju: ['esprit', 300], esprit: ['esprit', 300], suiton: ['suiton', 300], fer: ['physique', 375], fersurvie: ['physique', 200] }[nomPlan];
+    // V14.83 — plan « cauchemar » (Genjutsu Cauchemar : Esprit + Katon) : Esprit 300, puis Katon 200 (1 point pour 1), puis Vitalité.
+    const ETAPES_C = [['esprit', 300], ['katon', 200]];
+    const nomPlan = String(CFG.points).trim().toLowerCase(), PLAN_FIXE = nomPlan === 'cauchemar' ? (ETAPES_C.find(([c, l]) => (S.carac[c] || 0) < l) || ETAPES_C[ETAPES_C.length - 1]) : { senju: ['esprit', 300], esprit: ['esprit', 300], suiton: ['suiton', 300], fer: ['physique', 375], fersurvie: ['physique', 200] }[nomPlan];
     const planSenju = !!PLAN_FIXE && S.v5;
     if (planSenju && !S.voie) return false; // voie pas encore lue : j'attends, pour ne pas mettre des points au mauvais endroit
     if (planSenju && nomPlan === 'senju' && S.voie !== 'medical') return false; // Esprit 300 : seulement pour un Chirurgien
@@ -8944,7 +8947,7 @@
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
       ['evAller', 'M’emmener aux événements signalés (caravane, objet ou technique au sol) — sans rien ramasser', OUI],
       ['brisInutile', 'Briser tout l’équipement inutile à Ciel (garde les 2 meilleurs jets des pièces utiles)', OUI],
-      ['points', 'Répartition des points de caractéristiques', { fer: 'Lame de Fer : Physique 375 puis Vitalité', fersurvie: 'Lame de Fer survie (Kaguya) : Physique 200 puis Vitalité', senju: 'Chirurgien Senju : Esprit 300 puis Vitalité', esprit: 'Toute voie Esprit (Toxicologue, Sablier…) : Esprit 300 puis Vitalité', suiton: 'Domination (Suiton) : Suiton 300 puis Vitalité', aucun: 'Ne rien placer' }],
+      ['points', 'Répartition des points de caractéristiques', { fer: 'Lame de Fer : Physique 375 puis Vitalité', fersurvie: 'Lame de Fer survie (Kaguya) : Physique 200 puis Vitalité', senju: 'Chirurgien Senju : Esprit 300 puis Vitalité', esprit: 'Toute voie Esprit (Toxicologue, Sablier…) : Esprit 300 puis Vitalité', suiton: 'Domination (Suiton) : Suiton 300 puis Vitalité', cauchemar: 'Genjutsu Cauchemar : Esprit 300, Katon 200, puis Vitalité', aucun: 'Ne rien placer' }],
       ['specFerme', 'Fermer les spectateurs à chaque combat', OUI],
       ['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt', OUI],
       ['coffreHoraire', 'Un coffre mystérieux par heure aussi en Farm / XP / Ryōs / Quêtes (sceau aller-retour)', OUI],
