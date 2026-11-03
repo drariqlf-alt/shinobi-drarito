@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.84.0
+// @version     14.85.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.84-Drarito';
+  const VERSION = 'V14.85-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1324,6 +1324,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV22 !== 1) { CFG.drV22 = 1; if (CFG.farmPreset === 'farm-tourbillon' || /uzushio|tourbillon/.test(String(CFG.zoneFarm || ''))) { Object.assign(CFG, { nivGroupeMin: 450, nivGroupe: 608 }); S.cibleId = null; } sauve(); note('Drarito : Farm Île du Tourbillon — groupes de 450 à 608 niveaux au total'); } // V14.85
       if (estDrarito() && CFG.drV21 !== 1) { CFG.drV21 = 1; CFG.points = 'cauchemar'; S.depenseKO = 0; sauve(); note('Drarito : plan de points « Cauchemar » — Esprit 300, puis Katon 200 (vos sorts de feu : Fournaise, Lance, Explosion, Trait), puis Vitalité. Pour redistribuer les points déjà placés : « Refaire sa feuille » en jeu (gratuit), le bot replace tout seul.'); } // V14.83
       if (estDrarito() && CFG.drV20 !== 1) { CFG.drV20 = 1; CFG.drV17 = 1; Object.assign(CFG, { nivGroupe: 250, nivGroupeMin: 150 }); sauve(); note('Drarito : bornes des groupes remises à 150-250 niveaux au total (un ancien réglage à 150 écrasait le maximum)'); } // V14.80
       if (estDrarito() && CFG.drV16 !== 1) { // V14.72 — Drarito : FARM DES GROUPES À SON NIVEAU (mode XP rapide), toujours à pied, coffres mystérieux gardés
@@ -8550,7 +8551,7 @@
   };
   // V14.82 — FARMS DE ZONE PRÊTS À L'EMPLOI (cartes du choix des modes) : zones imposées + bornes du total de niveaux des groupes
   const PRESETS_FARM = {
-    'farm-tourbillon': { zoneFarm: 'rivage-d-uzushio,ruines-du-clan-uzumaki,grand-tourbillon', nivGroupeMin: 240, nivGroupe: 480 },
+    'farm-tourbillon': { zoneFarm: 'rivage-d-uzushio,ruines-du-clan-uzumaki,grand-tourbillon', nivGroupeMin: 450, nivGroupe: 608 },
     'farm-pluie': { zoneFarm: 'plaine-grise,tour-du-chef', nivGroupeMin: 150, nivGroupe: 250 },
   };
   const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', groupe: 'AFK groupe' };
@@ -8996,7 +8997,7 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 240 à 480 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
     CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { if (PRESETS_FARM[k]) { Object.assign(CFG, PRESETS_FARM[k], { mode: 'xp', farmPreset: k }); S.spotVise = null; S.spotForce = null; S.ezf = null; } else { CFG.mode = k; CFG.farmPreset = ''; if (k === 'xp') CFG.zoneFarm = ''; } sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
