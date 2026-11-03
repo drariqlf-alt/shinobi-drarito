@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.99.0
+// @version     15.0.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.99-Drarito';
+  const VERSION = 'V15.0-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -4044,7 +4044,8 @@
     const vaVers = (k, label, q, sig) => {
       if (q && S.espBloq && S.espBloq[k] > maintenant) { if (!(S.qPause[q] > maintenant)) { S.qPause[q] = S.espBloq[k]; (S.qRaison = S.qRaison || {})[q] = 'cible trop forte pour l’instant'; S.objTenu = null; note('Quête ' + q + ' : bloquée (cible trop forte pour l’instant) — je passe à une autre quête'); } return null; }
       let l = (B.especes[k] || {}).lieu;
-      if (enMonde()) { // le plan des zones dit où cette espèce apparaît : on prend l'endroit le plus proche
+      const vuIci = l && l.w === S.mapId && !(((S.vides || {})[k] || []).some((v) => maintenant - v.t < 2700000 && dist(v, l) < 500)); // V15.0 — un endroit où je l'ai vraiment combattu, sur cette île : il passe avant le plan
+      if (enMonde() && !vuIci) { // à défaut seulement : le plan des zones dit où cette espèce apparaît, on prend l'endroit le plus proche
         let mieux = null, nbLieux = 0;
         const cle = (q) => (mondeBut({}, q.z) && mondeBut({}, q.z) !== S.mapId ? 1e7 : 0) + dist(q, S.pos); // V14.94 — un endroit de mon île passe avant ceux des autres îles
         Object.keys(ZONES).forEach((z) => {
