@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.91.0
+// @version     14.92.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.91-Drarito';
+  const VERSION = 'V14.92-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2089,7 +2089,7 @@
         });
         if (!S.vus.has('carteCles')) { S.vus.add('carteCles'); retiens('carte : champs', Object.keys(v).join(', ') + ' · décors : ' + [...new Set((v.props || []).map((q) => q && (q.kind || q.type || q.id)))].slice(0, 40).join(', ')); }
       } catch (e) {}
-      if (m && /^world-exterieur@/.test(v.id)) { try { retientPortion(NAV.chunks.get(v.id)); } catch (e) {} }
+      if (m && /^world-[a-z0-9-]+@/.test(v.id)) { try { carteIle(v.id); retientPortion(NAV.chunks.get(v.id)); } catch (e) {} } // V14.92 — toutes les îles, chacune dans sa carte
     });
     if (R.carte) {
       const m = /@(-?\d+),(-?\d+)$/.exec(R.carte.id);
@@ -2148,16 +2148,16 @@
   // Obstacles que la carte ne montre pas (décors, étals, rochers) : heurtés deux fois, ils sont retenus trois jours.
   const FIXES = new Set();
   const TROIS_JOURS = 3 * 86400000;
-  try { Object.keys(B.heurts || {}).forEach((k) => { const h = B.heurts[k]; if (h.n >= 2 && Date.now() - h.t < TROIS_JOURS) FIXES.add(k); else if (Date.now() - h.t > TROIS_JOURS) delete B.heurts[k]; }); } catch (e) {}
+  try { Object.keys(B.heurts || {}).forEach((k) => { const h = B.heurts[k]; if (h.n >= 2 && Date.now() - h.t < TROIS_JOURS) { if (k.indexOf('|') < 0) FIXES.add(k); } else if (Date.now() - h.t > TROIS_JOURS) delete B.heurts[k]; }); } catch (e) {}
   function heurte(tx, ty) {
     if (!enMonde()) return;
     if (Object.keys(BAT).some((b) => { const q = (B.portes || {})[b] || batPos(b); return q && Math.abs(tx * 32 + 16 - q.x) < 110 && Math.abs(ty * 32 + 16 - q.y) < 110; })) return; // jamais autour d'une porte
     B.heurts = B.heurts || {};
-    const k = tx + ',' + ty, h = B.heurts[k] = B.heurts[k] || { n: 0, t: 0 };
+    const k = tx + ',' + ty, kh = cleH(k), h = B.heurts[kh] = B.heurts[kh] || { n: 0, t: 0 };
     h.n++; h.t = Date.now();
     if (h.n >= 2 && !FIXES.has(k)) { FIXES.add(k); S.obstacles = (S.obstacles || 0) + 1; }
     const cles = Object.keys(B.heurts);
-    if (cles.length > 3000) cles.sort((a, b) => B.heurts[a].t - B.heurts[b].t).slice(0, 500).forEach((x) => { delete B.heurts[x]; FIXES.delete(x); });
+    if (cles.length > 3000) cles.sort((a, b) => B.heurts[a].t - B.heurts[b].t).slice(0, 500).forEach((x) => { delete B.heurts[x]; FIXES.delete(x.split('|').pop()); });
     sauveB();
   }
   // Objets posés sur la carte (arbres, rochers, étals, caisses…) : le jeu les garde dans une liste à part, « props ». Ils arrêtent le
@@ -2231,13 +2231,21 @@
   // Cases réellement parcourues sans rien heurter (par le bot ou par vous) : la route préférée, gardée d'une session à l'autre.
   const PASSE = new Uint8Array(GW * GH);
   const PAS = { blocs: {}, sales: new Set(), tampon: [], n: 0, der: null, t: 0 };
+  // V14.92 — UNE CARTE PAR ÎLE. Le continent et chaque île (Uzushio, Terres des prêtresses…) ont leurs propres coordonnées, qui se recouvrent :
+  // jusqu'ici une seule grille servait pour tous, donc sur une île le bot voyait les murs et les chemins du continent au même endroit
+  // (et il ne relevait plus du tout la carte réelle depuis que le monde ne s'appelle plus « world-exterieur ») → heurts, indécisions, blocages.
+  const CONTINENT = 'world-continent-v6';
+  let GMONDE = CONTINENT;
+  const cleG = (base) => (GMONDE === CONTINENT ? base : base + ':' + GMONDE);
+  const cleH = (k) => (GMONDE === CONTINENT ? k : GMONDE + '|' + k); // obstacles heurtés : rangés par île
   // Maintenance d'octobre : le monde a été redessiné (zones déplacées, villages agrandis, nouveau Konoha).
   // Les murs, chemins et positions appris sur l'ancienne carte sont faux : on les oublie une fois, le bot réapprend en marchant.
   const MONDE_V = '3'; // 3 : monde agrandi (11 octobre, distances doublées entre les villages)
   let MONDE_NEUF = false;
+  try { if (localStorage.getItem('__sg_ileV') !== '1') { localStorage.setItem('__sg_ileV', '1'); localStorage.removeItem('__sg_pas'); } } catch (e) {} // V14.92 — les chemins parcourus sur les îles avaient été rangés dans la carte du continent : je les oublie une fois (la carte embarquée du continent reste)
   try { if (localStorage.getItem('__sg_mondeV') !== MONDE_V) { MONDE_NEUF = true; ['__sg_pas', '__sg_grille', '__sg_carte'].forEach((k) => localStorage.removeItem(k)); localStorage.setItem('__sg_mondeV', MONDE_V); } } catch (e) {}
   try {
-    PAS.blocs = JSON.parse(localStorage.getItem('__sg_pas') || '{}') || {};
+    PAS.blocs = JSON.parse(localStorage.getItem(cleG('__sg_pas')) || '{}') || {};
     Object.keys(PAS.blocs).forEach((k) => {
       const q = k.split(','), bx = Number(q[0]), by = Number(q[1]), bin = atob(PAS.blocs[k]);
       for (let n = 0; n < 1024; n++) if (bin.charCodeAt(n >> 3) & (1 << (n & 7))) { PASSE[(by * 32 + (n >> 5)) * GW + bx * 32 + (n & 31)] = 1; PAS.n++; }
@@ -2252,7 +2260,7 @@
       PAS.blocs[k] = btoa(bin);
     });
     PAS.sales.clear();
-    try { localStorage.setItem('__sg_pas', JSON.stringify(PAS.blocs)); } catch (e) {}
+    try { localStorage.setItem(cleG('__sg_pas'), JSON.stringify(PAS.blocs)); } catch (e) {}
   }
   const pasHeurt = () => { PAS.tampon = []; };
   // V14.62 — Drarito : sorties des villages apprises en marchant (par le bot ou par vous). Quand je passe d'un village à une autre zone
@@ -2277,6 +2285,7 @@
       if (estVillage(z) && !saut) {
         const V = B.villages[z] = B.villages[z] || { sx: 0, sy: 0, n: 0, r: 0, sorties: [] };
         if (V.n >= 400) { V.sx *= 0.9; V.sy *= 0.9; V.n *= 0.9; }
+        if (V.w && V.w !== S.mapId) return; V.w = V.w || S.mapId; // V14.92 — un village appartient à une seule île
         V.sx += S.pos.x; V.sy += S.pos.y; V.n++; const c = { x: V.sx / V.n, y: V.sy / V.n }; V.r = Math.max(V.r * 0.999, dist(c, S.pos));
       }
       VIL.z = z; VIL.der = { x: S.pos.x, y: S.pos.y }; VIL.t = now;
@@ -2290,9 +2299,10 @@
       Object.keys(B.villages).forEach((k) => {
         const V = B.villages[k]; if (!V || !V.n || !(V.sorties || []).length) return;
         const c = { x: V.sx / V.n, y: V.sy / V.n }, R = Math.max(600, V.r || 0);
-        const moiDedans = z === k, butDedans = dist(but, c) < R;
+        if (V.w && V.w !== S.mapId) return; // V14.92 — village d'une autre île (il partait vers la porte d'Amegakure depuis Uzushio)
+        if (dist(S.pos, c) > R + 2500) return; // village loin de moi : pas concerné, même si l'affichage de zone n'a pas encore changé
+        const moiDedans = z === k && dist(S.pos, c) < R + 300, butDedans = dist(but, c) < R;
         if (moiDedans === butDedans) return; // même côté de la muraille : pas besoin de porte
-        if (!moiDedans && dist(S.pos, c) > R + 2500) return; // village loin de moi : pas concerné
         V.sorties = (V.sorties || []).filter((p) => dist(p, c) < R + 600); // portes aberrantes (relevées pendant une téléportation) oubliées
         V.sorties.forEach((p) => { if (dist(S.pos, p) < 90) return; const cout = dist(S.pos, p) + dist(p, but); if (!best || cout < best.cout) best = { x: p.x, y: p.y, cout }; });
       });
@@ -2303,9 +2313,10 @@
     try {
       const now = Date.now();
       if (!S.self || !S.pos || !enMonde() || S.combat) { PAS.tampon = []; PAS.der = null; return; }
+      if (S.mapId !== GMONDE) carteIle(S.mapId); // V14.92 — la carte de l'île où je suis
       { // je me tiens sur cette case : elle est praticable, quoi que dise ma carte (arbres déplacés par les mises à jour du monde)
         const tu = Math.floor(S.pos.x / 32), tv = Math.floor(S.pos.y / 32), iu = tv * GW + tu;
-        if (tu > 0 && tv > 0 && tu < GW && tv < GH && GRILLE[iu] === 2) { GRILLE[iu] = 1; const ku = tu + ',' + tv; FIXES.delete(ku); if (B.heurts) delete B.heurts[ku]; }
+        if (tu > 0 && tv > 0 && tu < GW && tv < GH && GRILLE[iu] === 2) { GRILLE[iu] = 1; const ku = tu + ',' + tv; FIXES.delete(ku); if (B.heurts) delete B.heurts[cleH(ku)]; }
       }
       if (PAS.der && dist(PAS.der, S.pos) > 200) PAS.tampon = []; // téléportation
       const tx = Math.floor(S.pos.x / 32), ty = Math.floor(S.pos.y / 32);
@@ -2402,14 +2413,35 @@
     let bin = '';
     for (let i = 0; i < bits.length; i++) bin += String.fromCharCode(bits[i]);
     poseBits(k.ox, k.oy, w, h, bits); carteSale = Date.now();
-    for (let by = Math.max(0, k.oy >> 5); by <= Math.min(31, (k.oy + h - 1) >> 5); by++) for (let bx = Math.max(0, k.ox >> 5); bx <= Math.min(31, (k.ox + w - 1) >> 5); bx++) GSALE.add(bx + ',' + by);
+    for (let by = Math.max(0, k.oy >> 5); by <= Math.min(GH / 32 - 1, (k.oy + h - 1) >> 5); by++) for (let bx = Math.max(0, k.ox >> 5); bx <= Math.min(GW / 32 - 1, (k.ox + w - 1) >> 5); bx++) GSALE.add(bx + ',' + by);
   }
   function sauveCarte() {
     if (!carteSale || Date.now() - carteSale < 5000) return;
     carteSale = 0;
     GSALE.forEach((k) => { const q = k.split(','), b = blocGrille(Number(q[0]), Number(q[1])); if (b) GBLOCS[k] = b; });
     GSALE.clear();
-    try { localStorage.setItem('__sg_grille', JSON.stringify(GBLOCS)); } catch (e) {}
+    try { localStorage.setItem(cleG('__sg_grille'), JSON.stringify(GBLOCS)); } catch (e) {}
+  }
+  const chargeBlocs = () => {
+    try { GBLOCS = JSON.parse(localStorage.getItem(cleG('__sg_grille')) || '{}') || {}; } catch (e) { GBLOCS = {}; }
+    Object.keys(GBLOCS).forEach((k) => { try { const q = k.split(','), bx = Number(q[0]), by = Number(q[1]), bin = atob(GBLOCS[k]); for (let n = 0; n < 1024; n++) { const v = (bin.charCodeAt(n >> 2) >> ((n & 3) * 2)) & 3; if (v) GRILLE[(by * 32 + (n >> 5)) * GW + bx * 32 + (n & 31)] = v; } } catch (e) {} });
+    if (GMONDE === CONTINENT) { // la carte embarquée n'est valable que pour le continent
+      Object.keys(PAS_SUR).forEach((k) => { try { const q = k.split(','), bx = Number(q[0]), by = Number(q[1]), bin = atob(PAS_SUR[k]); for (let n = 0; n < 1024; n++) if (bin.charCodeAt(n >> 3) & (1 << (n & 7))) { const i = (by * 32 + (n >> 5)) * GW + bx * 32 + (n & 31); if (!PASSE[i] && GRILLE[i] !== 2) { PASSE[i] = 1; PAS.n++; } } } catch (e) {} });
+    }
+    try { PAS.blocs = JSON.parse(localStorage.getItem(cleG('__sg_pas')) || '{}') || {}; } catch (e) { PAS.blocs = {}; }
+    Object.keys(PAS.blocs).forEach((k) => { try { const q = k.split(','), bx = Number(q[0]), by = Number(q[1]), bin = atob(PAS.blocs[k]); for (let n = 0; n < 1024; n++) if (bin.charCodeAt(n >> 3) & (1 << (n & 7))) { PASSE[(by * 32 + (n >> 5)) * GW + bx * 32 + (n & 31)] = 1; PAS.n++; } } catch (e) {} });
+    FIXES.clear(); const pre = GMONDE === CONTINENT ? null : GMONDE + '|';
+    Object.keys(B.heurts || {}).forEach((k) => { const h = B.heurts[k]; if (!h || h.n < 2) return; if (pre ? k.indexOf(pre) === 0 : k.indexOf('|') < 0) FIXES.add(pre ? k.slice(pre.length) : k); });
+  };
+  function carteIle(w) { // je change d'île : je range la carte de l'ancienne et je sors celle de la nouvelle
+    w = String(w || '').split('@')[0].split(':')[0];
+    if (!/^world-/.test(w) || w === GMONDE) return;
+    try { if (GSALE.size) { carteSale = 1; sauveCarte(); } sauvePas(); } catch (e) {}
+    const avant = GMONDE; GMONDE = w;
+    GRILLE.fill(0); PASSE.fill(0); PAS.n = 0; PAS.tampon = []; PAS.der = null; PAS.sales.clear(); GSALE.clear(); CARTE = {};
+    chargeBlocs();
+    try { NAV.memo.clear(); NAV.route = []; NAV.murs.clear(); NAV.calcul = 0; NAV.prog = null; } catch (e) {}
+    note('Carte : je passe de ' + avant.replace(/^world-/, '') + ' à ' + w.replace(/^world-/, '') + ' (' + Object.keys(GBLOCS).length + ' blocs connus sur cette île, ' + PAS.n + ' cases parcourues)');
   }
   const AG = new Float32Array(GW * GH), AP = new Int32Array(GW * GH), AS = new Uint32Array(GW * GH);
   let aTour = 0;
@@ -2875,7 +2907,7 @@
       ia.n++;
       if (ia.n >= 3) {
         const t0 = tuile(S.pos); let oublies = 0;
-        for (let dx = -8; dx <= 8; dx++) for (let dy = -8; dy <= 8; dy++) { const k = (t0.x + dx) + ',' + (t0.y + dy); if (FIXES.delete(k)) oublies++; if (B.heurts) delete B.heurts[k]; NAV.murs.delete(k); }
+        for (let dx = -8; dx <= 8; dx++) for (let dy = -8; dy <= 8; dy++) { const k = (t0.x + dx) + ',' + (t0.y + dy); if (FIXES.delete(k)) oublies++; if (B.heurts) delete B.heurts[cleH(k)]; NAV.murs.delete(k); }
         NAV.memo.clear(); NAV.calcul = 0; S.inaccPause = maintenant + 60000; S.inacc = null; sauveB();
         note('Trois cibles « inaccessibles » de suite d’ici : ma carte se trompe sans doute autour de moi (' + oublies + ' obstacle(s) oublié(s)) — je réessaie la marche');
         return;
