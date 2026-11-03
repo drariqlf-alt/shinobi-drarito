@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.1.0
+// @version     15.2.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.1-Drarito';
+  const VERSION = 'V15.2-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -6147,7 +6147,7 @@
   // la place de la moins utile si elle vaut nettement plus (dégâts mesurés par PA ; les sorts de défense gardent une valeur fixe).
   const VAL_UTIL = { 'tronc.genjutsu.voile-reflexe': 150, 'academy.bunshin': 120, 'voile-v3.regard-voile': 90, 'voile-v3.voile-d-ombre': 80, 'academy.kawarimi': 60, 'voile-v3.pas-derobe': 40, 'tronc.genjutsu.faux-reflet': 30, 'voile-v3.epouvante': 25, 'voile-v3.oeil-du-guetteur': 20, 'voile-v3.vision-partagee': 15, 'voile-v3.dissipation': 15, 'voile-v3.brume-protectrice': 10, 'heritage.yamanaka.assistance': 60 };
   // V12.20 — techniques physiques (montent avec la Force / le Physique) : retirées de la barre et ignorées pour les points, sauf réglage contraire
-  const horsEsprit = (id) => { if (!estDrarito() || !Number(CFG.espritSeul) || /^(academy|tronc)\./.test(id)) return false; const t = S.techniques.get(id) || (B.fiches || {})[id]; return !!t && !!t.scaling && t.scaling !== 'esprit'; }; // V15.1 — Drarito : seulement les techniques qui montent avec l'Esprit (les autres sont retirées de la barre et jamais lancées)
+  const horsEsprit = (id) => { if (!estDrarito() || !Number(CFG.espritSeul) || /^(academy|tronc)\./.test(id)) return false; const t = S.techniques.get(id) || (B.fiches || {})[id]; if (!t || !t.scaling || t.scaling === 'esprit' || /^heritage\.nara\./.test(id)) return false; const dg = (t.effects || []).filter((e) => e && e.kind === 'damage'); return !(dg.length && dg.every((e) => e.type === 'esprit')); }; // V15.1 — V15.2 : les pouvoirs Nara (dégâts Esprit) sont gardés ; V15.1 — Drarito : seulement les techniques qui montent avec l'Esprit (les autres sont retirées de la barre et jamais lancées)
   const physique = (id) => { if (horsEsprit(id)) return true; if (!Number(CFG.sansPhys) || S.voie === 'kenjutsu' || S.voie === 'taijutsu' || ((S.carac || {}).physique || 0) > 0) return false; /* V14.11 — en Kenjutsu/Taijutsu ou avec des points en Physique, les techniques physiques sont mes armes */ const t = S.techniques.get(id) || (B.fiches || {})[id]; return !!t && /^(force|physique)$/.test(String(t.scaling || '')) && !/^(heritage|weapon|academy|tronc)\./.test(id); };
   Object.assign(VAL_UTIL, { 'coeur-de-bois-v3.cuirasse-de-bois': 85, 'coeur-de-bois-v3.reparation': 80, 'coeur-de-bois-v3.fil-de-vie': 75, 'coeur-de-bois-v3.ordre-armure-de-fer': 60, 'coeur-de-bois-v3.rembourrage': 55, 'coeur-de-bois-v3.bris-volontaire': 50, 'coeur-de-bois-v3.fils-d-entrave': 45, 'coeur-de-bois-v3.ordre-sacrifice': 40, 'coeur-de-bois-v3.ressort-cache': 25, 'coeur-de-bois-v3.fil-d-echange': 20 });
   const teste = (id) => { const d = (B.degSort || {})[id] || {}, b = (B.buffs || {})[id] || {}; return (d.n || 0) >= 5 || (d.ns || 0) >= 3 || (b.n || 0) >= 3 || (b.nd || 0) >= 3 || ((B.invTest || {})[id] || 0) >= 2 || ((B.lances || {})[id] || 0) >= 4 || !!(B.testKO || {})[id]; };
