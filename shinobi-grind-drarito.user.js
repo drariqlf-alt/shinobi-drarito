@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.85.0
+// @version     14.86.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.85-Drarito';
+  const VERSION = 'V14.86-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -648,6 +648,7 @@
   const axe = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const FORMATS = {
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
+    'player.route': (c) => { if (!Array.isArray(c.points) || c.points.length < 1 || c.points.length > 96) throw new Error('itinéraire invalide'); return { seq: ent(c.seq), points: c.points.map((p) => { const x = Number(p.x), y = Number(p.y); if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > 1e5 || y > 1e5) throw new Error('point invalide'); return { x, y }; }), sprint: c.sprint === true }; }, // V14.86 — même format que le clic-pour-se-déplacer du jeu
     'world.interact': (c) => ({ targetId: txt(c.targetId) }),
     'world.examine': (c) => (c.clueId ? { placeId: txt(c.placeId), clueId: txt(c.clueId) } : { placeId: txt(c.placeId) }),
     'archives.request': () => ({}),
@@ -1324,6 +1325,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV23 !== 1) { CFG.drV23 = 1; CFG.courseAuto = 1; sauve(); } // V14.86
       if (estDrarito() && CFG.drV22 !== 1) { CFG.drV22 = 1; if (CFG.farmPreset === 'farm-tourbillon' || /uzushio|tourbillon/.test(String(CFG.zoneFarm || ''))) { Object.assign(CFG, { nivGroupeMin: 450, nivGroupe: 608 }); S.cibleId = null; } sauve(); note('Drarito : Farm Île du Tourbillon — groupes de 450 à 608 niveaux au total'); } // V14.85
       if (estDrarito() && CFG.drV21 !== 1) { CFG.drV21 = 1; CFG.points = 'cauchemar'; S.depenseKO = 0; sauve(); note('Drarito : plan de points « Cauchemar » — Esprit 300, puis Katon 200 (vos sorts de feu : Fournaise, Lance, Explosion, Trait), puis Vitalité. Pour redistribuer les points déjà placés : « Refaire sa feuille » en jeu (gratuit), le bot replace tout seul.'); } // V14.83
       if (estDrarito() && CFG.drV20 !== 1) { CFG.drV20 = 1; CFG.drV17 = 1; Object.assign(CFG, { nivGroupe: 250, nivGroupeMin: 150 }); sauve(); note('Drarito : bornes des groupes remises à 150-250 niveaux au total (un ancien réglage à 150 écrasait le maximum)'); } // V14.80
@@ -1748,9 +1750,10 @@
     if (!S.retourDit || now - S.retourDit > 60000) { S.retourDit = now; note('Retour en arrière du serveur (' + Math.round(d) + ' px, mur devant moi en ' + Math.round(av.x) + ',' + Math.round(av.y) + ') : je marque ce passage comme fermé et je prends une autre route'); }
   }
   function bouge(dir) {
-    if (S.dir && S.dir.x === dir.x && S.dir.y === dir.y) return;
+    if (S.dir && !S.dir.route && S.dir.x === dir.x && S.dir.y === dir.y) return;
+    if (S.course) S.course.actif = false; // V14.86 — une direction à la main remplace l'itinéraire de course auto
     if (estDrarito() && (dir.x || dir.y)) { // V14.70 — pas de zigzag contre un mur
-      const now = Date.now(), avant = S.dir && (S.dir.x || S.dir.y), pv = avant ? S.dir.x * dir.x + S.dir.y * dir.y : 1;
+      const now = Date.now(), avant = S.dir && !S.dir.route && (S.dir.x || S.dir.y), pv = avant ? S.dir.x * dir.x + S.dir.y * dir.y : 1;
       if (pv < 0) { S.dirT = now; S.arretT = now; S.dir = { x: 0, y: 0 }; S.marche = false; S.botSeq = true; envoie('player.move', { seq: ++S.lastSeq, dir: { x: 0, y: 0 }, sprint: false }); return; } // demi-tour : arrêt d'abord
       if (!avant && now - (S.arretT || 0) < 250) return; // juste après l'arrêt d'un demi-tour : je laisse le serveur se caler
       if (pv <= 0 && now - (S.dirT || 0) < 250) return; // virage franc (90° ou plus) : au plus un toutes les 0,25 s ; les petits ajustements passent
@@ -2761,7 +2764,38 @@
         if (NAV.anticipeT !== Math.floor(maintenant / 1500)) { NAV.anticipeT = Math.floor(maintenant / 1500); NAV.calcul = 0; NAV.memo.clear(); } // et je recalcule la route tout de suite
       } else if (loin && devant(3, dir) && NAV.anticipeT !== Math.floor(maintenant / 3000)) { NAV.anticipeT = Math.floor(maintenant / 3000); NAV.calcul = 0; } // obstacle à 3 cases : je recalcule déjà
     }
+    if ((dir.x || dir.y) && courseAuto(c, vise)) return true; // V14.86 — course auto du jeu : un itinéraire entier au lieu d'une direction à la fois
     bouge(dir);
+    return true;
+  }
+  // V14.86 — COURSE AUTO (comme un clic sur la carte) : j'envoie au jeu l'itinéraire des prochaines cases de ma route (« player.route »,
+  // le message du clic-pour-se-déplacer, 96 points au plus) ; le serveur fait marcher le personnage d'un seul tenant, sans à-coups ni
+  // changements de direction répétés. Je renvoie la suite quand j'approche du bout, quand le but change, ou quand je n'avance plus.
+  // Si le serveur ne me fait pas avancer, je reprends la marche case par case pendant 10 s.
+  function courseAuto(c, vise) {
+    if (!estDrarito() || Number(CFG.courseAuto) === 0 || !S.pos || S.combat || !enMonde()) return false;
+    const now = Date.now(), R = S.course;
+    if ((S.courseKO || 0) > now) return false;
+    const pts = [{ x: Math.round(S.pos.x * 10) / 10, y: Math.round(S.pos.y * 10) / 10 }];
+    let L = 0, der = pts[0], dirPrec = null;
+    const ajoute = (p, force) => { const d = dist(der, p); if (d < 8) return; const dr = { x: Math.sign(Math.round(p.x - der.x)), y: Math.sign(Math.round(p.y - der.y)) }; if (!force && dirPrec && dr.x === dirPrec.x && dr.y === dirPrec.y && pts.length > 1) { pts[pts.length - 1] = { x: p.x, y: p.y }; } else pts.push({ x: p.x, y: p.y }); L += d; der = p; dirPrec = dr; };
+    if (NAV.route.length) { for (let i = 0; i < NAV.route.length && i < 60 && L < 1800 && pts.length < 90; i++) ajoute(centre(NAV.route[i])); if (!NAV.route.length || dist(der, c) < 48 || vueLibre(der, c)) ajoute({ x: c.x, y: c.y }, true); }
+    else ajoute({ x: vise.x, y: vise.y }, true);
+    if (pts.length < 2) return false;
+    const fin = pts[pts.length - 1];
+    if (R && R.actif) {
+      const avance = dist(S.pos, R.pos0) > 30 || dist(S.pos, R.posT) > 24;
+      if (dist(S.pos, R.posT) > 24) { R.posT = { x: S.pos.x, y: S.pos.y }; R.tT = now; }
+      if (now - R.tT > 2500) { R.actif = false; S.courseKO = now + 10000; S.dir = null; if (!S.courseDitKO || now - S.courseDitKO > 120000) { S.courseDitKO = now; note('Course auto : le jeu ne me fait plus avancer ici (' + Math.round(S.pos.x) + ',' + Math.round(S.pos.y) + ') — je marche case par case 10 s'); } return false; }
+      const memeBut = dist(R.fin, fin) < 64 || dist(R.but, c) < 48;
+      if (memeBut && dist(S.pos, R.fin) > 110 && now - R.t < 6000 && avance !== null) return true; // l'itinéraire en cours suffit
+    }
+    S.botSeq = true; S.marche = true;
+    if (!envoie('player.route', { seq: ++S.lastSeq, points: pts, sprint: CFG.rythme !== 'calme' })) return false;
+    const d0 = { x: Math.sign(Math.round(pts[1].x - pts[0].x)), y: Math.sign(Math.round(pts[1].y - pts[0].y)) };
+    S.dir = { x: d0.x, y: d0.y, route: true }; // pour la détection des murs : la direction du premier tronçon
+    S.course = { actif: true, t: now, pos0: { x: S.pos.x, y: S.pos.y }, posT: { x: S.pos.x, y: S.pos.y }, tT: now, fin, but: { x: c.x, y: c.y }, n: pts.length };
+    if (!S.courseDit) { S.courseDit = 1; note('Course auto du jeu activée : je donne au jeu l’itinéraire entier (jusqu’à ' + Math.round(L) + ' px, ' + pts.length + ' points) au lieu d’une direction à la fois'); }
     return true;
   }
 
@@ -8944,7 +8978,7 @@
       ['donjons', 'Faire les donjons dont j’ai la clef', OUI],
       ['biju', 'Aller aux antres de bijū ouverts', OUI],
       ['sceauxDecouvre', 'Aller découvrir les sceaux manquants', OUI],
-      ['tournee', 'Tournée des sceaux : découvrir tous les sceaux atteignables, puis les quêtes', OUI],
+      ['tournee', 'Tournée des sceaux : découvrir tous les sceaux atteignables, puis les quêtes', OUI], ['sceaux', 'Voyager par les sceaux (sinon tout à pied)', OUI], ['courseAuto', 'Course auto du jeu : itinéraire entier envoyé au jeu (sinon pas à pas)', OUI],
       ['aokiri', 'Aokiri : coffres du Pays de l’Eau (un par heure), sinon quêtes du Pays de l’Eau, sinon farm des groupes de monstres', OUI],
       ['journalFichier', 'Journal dans un fichier (Téléchargements, toutes les 10 min) pour la vérification automatique', OUI],
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
@@ -9013,7 +9047,7 @@
         if (ko || pd) { const b = el('button', 'b large', '▶ Relancer ' + nomDj(v) + ' maintenant (en pause ' + (ko ? Math.ceil((B.djKO[v] - Date.now()) / 60000) + ' min' : 'jusqu’au niveau ' + pd) + ')'); b.onclick = () => { if (B.djKO) delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; if (S.djRefus) S.djRefus[v] = 0; sauveB(); note('Donjon ' + nomDj(v) + ' : pause levée à la main'); b.textContent = 'Pause levée ✓'; b.disabled = true; }; ctx.append(b); } }
       else if (CFG.mode === 'quetes') { blocReg(ctx, 'Quêtes', [['villagesPrio', 'Villages prioritaires'], ['quotidiennes', 'Missions quotidiennes (réputation)']]); ctx.append(el('div', 'sec', 'Quêtes en cours')); quetes = corpsQuetes(); ctx.append(quetes.el); quetes.maj(); }
       if (estDrarito()) blocReg(ctx, 'Pays de l’Eau (Aokiri)', [['aokiri', 'Option Aokiri']], 'Oui : coffres mystérieux du Pays de l’Eau dès qu’un est permis (un par heure), sinon les quêtes du Pays de l’Eau, sinon farm des groupes de monstres. Laissez le mode sur Quêtes. Non : quêtes sur tout le continent.'); // V14.58 — l'option était cachée
-      blocReg(ctx, 'En chemin', [['sceaux', 'Voyager par les sceaux (sinon tout à pied)'], ['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
+      blocReg(ctx, 'En chemin', [['courseAuto', 'Course auto du jeu (itinéraire entier)'], ['sceaux', 'Voyager par les sceaux (sinon tout à pied)'], ['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
       { // V14.0 — énigmes des marchands ambulants
         const E = B.enig || { r: {}, faits: {}, ko: {} }, ks = Object.keys(E.r || {}).filter((k) => enigActive(E.r[k]) || (E.faits[E.r[k].place] && Date.now() - E.faits[E.r[k].place] < 2 * 3600000)).sort((a, b) => E.r[b].vu - E.r[a].vu).slice(0, 6);
         ctx.append(el('div', 'sec', 'Énigmes des marchands'));
