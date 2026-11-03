@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.88.0
+// @version     14.89.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.88-Drarito';
+  const VERSION = 'V14.89-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -647,6 +647,7 @@
   const ent = (v) => { if (!Number.isInteger(v) || v < 0) throw new Error('nombre invalide'); return v; };
   const axe = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const FORMATS = {
+    'party.locate': () => ({}), // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
     'player.route': (c) => { if (!Array.isArray(c.points) || c.points.length < 1 || c.points.length > 96) throw new Error('itinéraire invalide'); return { seq: ent(c.seq), points: c.points.map((p) => { const x = Number(p.x), y = Number(p.y); if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > 1e5 || y > 1e5) throw new Error('point invalide'); return { x, y }; }), sprint: c.sprint === true }; }, // V14.86 — même format que le clic-pour-se-déplacer du jeu
     'world.interact': (c) => ({ targetId: txt(c.targetId) }),
@@ -1188,7 +1189,9 @@
     // Groupe et combats d'alliés : j'apprends la forme exacte de ce que le jeu envoie (invitation, membres, combat à rejoindre) avant d'écrire l'option.
     try {
       S.nbGroupe = S.nbGroupe || 0;
-      if (ev === 'party.updated' && d) { const m = ((d.party || {}).members || []); S.groupeN = m.length; } // V14.25 — taille de mon groupe (pour les sorts de soutien)
+      if (ev === 'party.updated' && d) { const m = ((d.party || {}).members || []); S.groupeN = m.length; S.groupeMembres = m.map((x) => ({ id: x.id || x.playerId, nom: x.name || x.id || x.playerId, chef: !!x.leader || (d.party && d.party.leaderId === x.id), enLigne: x.online !== false })); }
+      if (ev === 'party.left') { S.groupeMembres = []; S.groupeN = 0; S.posGroupe = null; }
+      if (ev === 'party.positions' && d && Array.isArray(d.members)) { S.posGroupe = { t: Date.now(), m: new Map(d.members.map((x) => [x.id || x.playerId, { mapId: x.mapId, x: x.x, y: x.y }])) }; } // V14.89 // V14.25 — taille de mon groupe (pour les sorts de soutien)
       if (ev === 'party.fight' && d && d.from) S.allieJoin = { fin: Date.now() + Math.max(3000, Math.min(30000, (d.joinableForMs || 15000) - 1500)), nom: d.from.name || '?', contre: d.enemy || '?', id: d.combatId };
       if (ev === 'party.fight' && d && d.from) note('Combat d’allié : ' + (d.from.name || '?') + ' contre ' + (d.enemy || '?') + (d.enemies ? ' (' + d.enemies + ' ennemis)' : '') + ' · rejoignable ' + Math.round((d.joinableForMs || 0) / 1000) + ' s');
       if (ev !== 'party.positions' && ev !== 'world.joined' && S.nbGroupe < 60 && ((S.grpVus = S.grpVus || {})[ev] = (S.grpVus[ev] || 0) + 1) <= 2 && (/^(party|group|squad)\.|join|assist|help|renfort|invit|ally|allie/i.test(ev))) { S.nbGroupe++; retiens('groupe ' + ev + ' #' + S.nbGroupe, JSON.stringify(d).slice(0, 900)); }
@@ -1325,6 +1328,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV26 !== 1) { CFG.drV26 = 1; if (CFG.suivreGroupe == null) CFG.suivreGroupe = 1; sauve(); } // V14.89
       if (estDrarito() && CFG.drV25 !== 1) { CFG.drV25 = 1; CFG.nivGroupe = 640; if (!CFG.nivGroupeMin) CFG.nivGroupeMin = 480; S.cibleId = null; sauve(); note('Drarito : groupes de ' + CFG.nivGroupeMin + ' à 640 niveaux au total (700 trop dur)'); } // V14.88
       if (estDrarito() && CFG.drV24 !== 1) { CFG.drV24 = 1; Object.assign(CFG, { mode: 'xp', farmPreset: 'farm-ici', zoneFarm: '@ici', farmAncre: null, nivGroupeMin: 480, nivGroupe: 640 }); S.cibleId = null; S.spotVise = null; S.ezf = null; sauve(); note('Drarito : Farm ici — la zone où je suis (Terres des prêtresses) sera retenue dès que je vois ses ennemis · groupes de 480 à 640 niveaux'); } // V14.87
       if (estDrarito() && CFG.drV23 !== 1) { CFG.drV23 = 1; CFG.courseAuto = 1; sauve(); } // V14.86
@@ -7288,6 +7292,7 @@
       // et je rejoins chaque combat que lance un membre de mon groupe (fenêtre « Combat de groupe », d'où que je sois dans la zone).
       if (CFG.mode === 'groupe') {
         if (Number(CFG.soin) && S.maxHp > 0 && S.hp < 0.95 * S.maxHp && await soigne()) return;
+        if (suisGroupe()) return; // V14.89 — je suis le joueur choisi de mon groupe sur la carte
         stop();
         statut('AFK groupe : j’attends un combat d’un allié' + (S.allieJoin ? ' · ' + S.allieJoin.nom + ' se bat' : ''), true);
         return;
@@ -7943,6 +7948,30 @@
     S.gpsEchecs = (S.gpsEchecs || []).filter((t) => now - t < 1800000).concat([now]);
     if (S.gpsEchecs.length >= 2) { S.gpsHS = now + 3600000; S.gpsEchecs = []; note('GPS du jeu : deux échecs en 30 min — je ne l’utilise plus pendant 1 h, je prends mes propres chemins'); }
     return false;
+  }
+  // V14.89 — AFK GROUPE : SUIVRE UN JOUEUR DU GROUPE. Toutes les 5 s je demande au jeu la position des membres (party.locate, comme la carte
+  // du groupe) et je marche vers le joueur choisi (Réglages → Combat → « Joueur à suivre » ; par défaut le chef, ou le seul autre membre).
+  // Je m'arrête à 250 px de lui ; s'il est dans un bâtiment ou une autre carte, je l'attends là où je suis.
+  function cibleSuivie() {
+    const L = (S.groupeMembres || []).filter((x) => x.id !== (S.self && S.self.id) && x.enLigne);
+    if (!L.length) return null;
+    const voulu = String(CFG.suivreNom || '').trim().toLowerCase();
+    return (voulu && L.find((x) => String(x.nom).toLowerCase() === voulu)) || L.find((x) => x.chef) || L[0];
+  }
+  function suisGroupe() {
+    if (Number(CFG.suivreGroupe) !== 1 || S.combat || !enMonde() || !S.pos) return false;
+    const c = cibleSuivie(); if (!c) { statut('AFK groupe : personne à suivre (aucun autre membre en ligne dans mon groupe)', true); return false; }
+    const now = Date.now();
+    if (now - (S.locateT || 0) > 5000) { S.locateT = now; envoie('party.locate', {}); }
+    const P = S.posGroupe && now - S.posGroupe.t < 15000 ? S.posGroupe.m.get(c.id) : null;
+    if (!P) { statut('AFK groupe : je cherche où est ' + c.nom + '…', true); return false; }
+    if (P.mapId !== S.mapId) { statut('AFK groupe : ' + c.nom + ' est ailleurs (' + P.mapId + ') — je l’attends ici', true); return false; }
+    const d = dist(P, S.pos);
+    if (d < 250) { statut('AFK groupe : à côté de ' + c.nom + ' · j’attends ses combats', true); return false; }
+    if (S.suiviDit !== c.id) { S.suiviDit = c.id; note('AFK groupe : je suis ' + c.nom + ' sur la carte'); }
+    statut('AFK groupe : je suis ' + c.nom + ' · ' + Math.round(d) + ' px', true);
+    if (!navigue({ x: P.x, y: P.y })) { stop(); return false; }
+    return true;
   }
   function gpsArret() { const N = S.gps; S.gps = null; if (N && N.route && N.route.id) try { envoie('navigation.cancel', { id: N.route.id }); } catch (e) {} }
   function gpsRecu(ev, d) {
@@ -8990,6 +9019,8 @@
       ['voixTg', 'Il vous écrit aussi sur Telegram', OUI],
       ['tgTchat', 'Tchat du jeu relayé sur Telegram', OUI],
       ['allies', 'Combats de mon groupe', { rejoindre: 'Les rejoindre', ignorer: 'Les ignorer', moi: 'Me laisser choisir' }],
+      ['suivreGroupe', 'AFK groupe : suivre un joueur de mon groupe sur la carte', OUI],
+      ['suivreNom', 'Joueur à suivre (AFK groupe)', () => { const o = { '': 'Le chef du groupe (ou le seul autre membre)' }; (S.groupeMembres || []).filter((x) => !S.self || x.id !== S.self.id).forEach((x) => { o[x.nom] = x.nom + (x.chef ? ' (chef)' : ''); }); if (CFG.suivreNom && !o[CFG.suivreNom]) o[CFG.suivreNom] = CFG.suivreNom; return o; }],
       ['equip', 'Essayer l’équipement et garder le meilleur', OUI],
       ['donjons', 'Faire les donjons dont j’ai la clef', OUI],
       ['biju', 'Aller aux antres de bijū ouverts', OUI],
@@ -9083,7 +9114,7 @@
   }
   function corpsCombat() {
     const z = el('div');
-    blocReg(z, 'Choix des combats', [['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt'], ['seuil', 'Chances de victoire minimum (%)'], ['meute', 'Taille maximum d’un groupe ennemi'], ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'], ['nivGroupeMin', 'Niveau total minimum d’un groupe (0 = pas de minimum)'], ['zoneFarm', 'Zone de farm (mode Farm XP)'], ['allies', 'Combats de mon groupe'], ['specFerme', 'Fermer les spectateurs à chaque combat'], ['coffreOuvre', 'Ouvrir les coffres mystérieux']]);
+    blocReg(z, 'Choix des combats', [['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt'], ['seuil', 'Chances de victoire minimum (%)'], ['meute', 'Taille maximum d’un groupe ennemi'], ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'], ['nivGroupeMin', 'Niveau total minimum d’un groupe (0 = pas de minimum)'], ['zoneFarm', 'Zone de farm (mode Farm XP)'], ['allies', 'Combats de mon groupe'], ['suivreGroupe', 'AFK groupe : suivre un joueur du groupe'], ['suivreNom', 'Joueur à suivre'], ['specFerme', 'Fermer les spectateurs à chaque combat'], ['coffreOuvre', 'Ouvrir les coffres mystérieux']]);
     blocReg(z, 'Soins', [['soinEntre', 'Entre deux combats, se soigner sous'], ['achatSoins', 'Racheter des soins quand il en manque']], 'Contre un boss en groupe, Ciel joue soigneur : les alliés blessés passent avant ses coups.');
     blocReg(z, 'Sorts', [['testTout', 'Tester chaque sort pour garder les meilleurs'], ['sansPhys', 'Retirer les techniques physiques (Force)'], ['suivis', 'Joueurs suivis dans les rapports']]);
     blocReg(z, 'Rythme', [['rythme', 'Rythme'], ['delai', 'Secondes entre deux actions (0 à 3)']]);
