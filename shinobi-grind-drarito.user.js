@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.0.0
+// @version     15.1.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.0-Drarito';
+  const VERSION = 'V15.1-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1339,6 +1339,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV28 !== 1) { CFG.drV28 = 1; CFG.points = 'espritmax'; CFG.espritSeul = 1; S.depenseKO = 0; S.barDerT = 0; sauve(); note('Drarito : tout en Esprit et seulement les techniques Esprit. Pour récupérer les points déjà mis en Katon et Vitalité : « Refaire sa feuille » dans le jeu (gratuit), je replace tout en Esprit.'); } // V15.1
       if (estDrarito() && CFG.drV27 !== 1) { CFG.drV27 = 1; sauve(); let n = 0; Object.keys(B.especes || {}).forEach((k) => { const L = B.especes[k] && B.especes[k].lieu; if (L && !L.w) { delete B.especes[k].lieu; n++; } }); Object.keys(B.boss || {}).forEach((k) => { if (B.boss[k] && B.boss[k].x != null && !B.boss[k].w) { delete B.boss[k].x; delete B.boss[k].y; } }); sauveB(); note('Carte : ' + n + ' coins de chasse sans île connue oubliés (ils se réapprennent au premier combat) — fini les trajets vers une autre île à pied'); } // V14.98
       if (estDrarito() && CFG.drV26 !== 1) { CFG.drV26 = 1; if (CFG.suivreGroupe == null) CFG.suivreGroupe = 1; sauve(); } // V14.89
       if (estDrarito() && CFG.drV25 !== 1) { CFG.drV25 = 1; CFG.nivGroupe = 640; if (!CFG.nivGroupeMin) CFG.nivGroupeMin = 480; S.cibleId = null; sauve(); note('Drarito : groupes de ' + CFG.nivGroupeMin + ' à 640 niveaux au total (700 trop dur)'); } // V14.88
@@ -5675,10 +5676,10 @@
     // Le plan « senju » (Esprit) ne sert qu'à un Chirurgien : en Kenjutsu, il passe tout seul sur « fer ».
     if (S.v5 && S.voie === 'kenjutsu' && String(CFG.points).trim().toLowerCase() === 'senju') { CFG.points = 'fer'; sauve(); note('Points : vous êtes passé Kenjutsu — plan « senju » (Esprit) remplacé par « fer » : Physique 375, puis Vitalité'); }
     { const voulu = { kenjutsu: 'fer', medical: 'senju', genjutsu: 'esprit' }[S.voie], actuel = String(CFG.points).trim().toLowerCase(); // V14.17 — changement de voie : le plan suit
-      if (S.v5 && voulu && /^(fer|fersurvie|senju|esprit|suiton)$/.test(actuel) && !(voulu === 'fer' && actuel === 'fersurvie') && !(voulu === 'senju' && actuel === 'esprit') && actuel !== voulu) { CFG.points = voulu; sauve(); note('Points : voie ' + S.voie + ' — plan « ' + actuel + ' » remplacé par « ' + voulu + ' »'); } }
+      if (S.v5 && voulu && /^(fer|fersurvie|senju|esprit|suiton|espritmax)$/.test(actuel) && actuel !== 'espritmax' && !(voulu === 'fer' && actuel === 'fersurvie') && !(voulu === 'senju' && actuel === 'esprit') && actuel !== voulu) { CFG.points = voulu; sauve(); note('Points : voie ' + S.voie + ' — plan « ' + actuel + ' » remplacé par « ' + voulu + ' »'); } }
     // V14.83 — plan « cauchemar » (Genjutsu Cauchemar : Esprit + Katon) : Esprit 300, puis Katon 200 (1 point pour 1), puis Vitalité.
     const ETAPES_C = [['esprit', 300], ['katon', 200]];
-    const nomPlan = String(CFG.points).trim().toLowerCase(), PLAN_FIXE = nomPlan === 'cauchemar' ? (ETAPES_C.find(([c, l]) => (S.carac[c] || 0) < l) || ETAPES_C[ETAPES_C.length - 1]) : { senju: ['esprit', 300], esprit: ['esprit', 300], suiton: ['suiton', 300], fer: ['physique', 375], fersurvie: ['physique', 200] }[nomPlan];
+    const nomPlan = String(CFG.points).trim().toLowerCase(), PLAN_FIXE = nomPlan === 'cauchemar' ? (ETAPES_C.find(([c, l]) => (S.carac[c] || 0) < l) || ETAPES_C[ETAPES_C.length - 1]) : { espritmax: ['esprit', 1e9], senju: ['esprit', 300], esprit: ['esprit', 300], suiton: ['suiton', 300], fer: ['physique', 375], fersurvie: ['physique', 200] }[nomPlan];
     const planSenju = !!PLAN_FIXE && S.v5;
     if (planSenju && !S.voie) return false; // voie pas encore lue : j'attends, pour ne pas mettre des points au mauvais endroit
     if (planSenju && nomPlan === 'senju' && S.voie !== 'medical') return false; // Esprit 300 : seulement pour un Chirurgien
@@ -6146,7 +6147,8 @@
   // la place de la moins utile si elle vaut nettement plus (dégâts mesurés par PA ; les sorts de défense gardent une valeur fixe).
   const VAL_UTIL = { 'tronc.genjutsu.voile-reflexe': 150, 'academy.bunshin': 120, 'voile-v3.regard-voile': 90, 'voile-v3.voile-d-ombre': 80, 'academy.kawarimi': 60, 'voile-v3.pas-derobe': 40, 'tronc.genjutsu.faux-reflet': 30, 'voile-v3.epouvante': 25, 'voile-v3.oeil-du-guetteur': 20, 'voile-v3.vision-partagee': 15, 'voile-v3.dissipation': 15, 'voile-v3.brume-protectrice': 10, 'heritage.yamanaka.assistance': 60 };
   // V12.20 — techniques physiques (montent avec la Force / le Physique) : retirées de la barre et ignorées pour les points, sauf réglage contraire
-  const physique = (id) => { if (!Number(CFG.sansPhys) || S.voie === 'kenjutsu' || S.voie === 'taijutsu' || ((S.carac || {}).physique || 0) > 0) return false; /* V14.11 — en Kenjutsu/Taijutsu ou avec des points en Physique, les techniques physiques sont mes armes */ const t = S.techniques.get(id) || (B.fiches || {})[id]; return !!t && /^(force|physique)$/.test(String(t.scaling || '')) && !/^(heritage|weapon|academy|tronc)\./.test(id); };
+  const horsEsprit = (id) => { if (!estDrarito() || !Number(CFG.espritSeul) || /^(academy|tronc)\./.test(id)) return false; const t = S.techniques.get(id) || (B.fiches || {})[id]; return !!t && !!t.scaling && t.scaling !== 'esprit'; }; // V15.1 — Drarito : seulement les techniques qui montent avec l'Esprit (les autres sont retirées de la barre et jamais lancées)
+  const physique = (id) => { if (horsEsprit(id)) return true; if (!Number(CFG.sansPhys) || S.voie === 'kenjutsu' || S.voie === 'taijutsu' || ((S.carac || {}).physique || 0) > 0) return false; /* V14.11 — en Kenjutsu/Taijutsu ou avec des points en Physique, les techniques physiques sont mes armes */ const t = S.techniques.get(id) || (B.fiches || {})[id]; return !!t && /^(force|physique)$/.test(String(t.scaling || '')) && !/^(heritage|weapon|academy|tronc)\./.test(id); };
   Object.assign(VAL_UTIL, { 'coeur-de-bois-v3.cuirasse-de-bois': 85, 'coeur-de-bois-v3.reparation': 80, 'coeur-de-bois-v3.fil-de-vie': 75, 'coeur-de-bois-v3.ordre-armure-de-fer': 60, 'coeur-de-bois-v3.rembourrage': 55, 'coeur-de-bois-v3.bris-volontaire': 50, 'coeur-de-bois-v3.fils-d-entrave': 45, 'coeur-de-bois-v3.ordre-sacrifice': 40, 'coeur-de-bois-v3.ressort-cache': 25, 'coeur-de-bois-v3.fil-d-echange': 20 });
   const teste = (id) => { const d = (B.degSort || {})[id] || {}, b = (B.buffs || {})[id] || {}; return (d.n || 0) >= 5 || (d.ns || 0) >= 3 || (b.n || 0) >= 3 || (b.nd || 0) >= 3 || ((B.invTest || {})[id] || 0) >= 2 || ((B.lances || {})[id] || 0) >= 4 || !!(B.testKO || {})[id]; };
   Object.assign(VAL_UTIL, { 'chirurgien-v3.egide': 120, 'chirurgien-v3.renaissance': 110, 'chirurgien-v3.point-de-suture': 100, 'chirurgien-v3.pilule-du-soldat': 95, 'chirurgien-v3.barriere': 80, 'chirurgien-v3.point-de-pression': 45, 'chirurgien-v3.vague-de-reflux': 15 }); // V12.31 — Chirurgien : survie pour les boss
@@ -9220,6 +9222,7 @@
       ['suivis', 'Joueurs dont j’enregistre tout en combat (noms séparés par des virgules)'],
       ['soinEntre', 'Entre deux combats, je me soigne (Baumes de l’Alliance d’abord) sous ce % de PV', { 95: '95 %', 85: '85 %', 70: '70 %', 50: '50 %' }],
       ['sansPhys', 'Techniques physiques (Force) : les retirer de la barre et ne jamais y mettre de points', OUI],
+      ['espritSeul', 'Seulement les techniques Esprit (les autres sont retirées de la barre et jamais lancées)', OUI],
       ['djSinon', 'Mode Donjons, sans donjon faisable', { cles: 'Farmer la clef du meilleur donjon', attendre: 'Attendre sur place', xp: 'XP en attendant' }],
       ['quete', 'Quête à faire en premier', () => { const o = { '': 'Automatique (ordre du bot)' }; S.q.liste.filter((q) => q.status === 'active').forEach((q) => { o[q.questId] = ((S.q.defs.get(q.questId) || {}).name || q.questId).slice(0, 46); }); if (CFG.quete && !o[CFG.quete]) o[CFG.quete] = CFG.quete; return o; }],
       ['queteNivMin', 'Quêtes à XP : niveau minimum (les quêtes de clan et de grade sont toujours faites)', { 100: 'Niveau 100 et plus', 120: 'Niveau 120 et plus', 80: 'Niveau 80 et plus', 0: 'Toutes' }],
@@ -9252,7 +9255,7 @@
       ['enigmes', 'Résoudre les énigmes des marchands ambulants (aller au lieu et examiner les indices)', OUI],
       ['evAller', 'M’emmener aux événements signalés (caravane, objet ou technique au sol) — sans rien ramasser', OUI],
       ['brisInutile', 'Briser tout l’équipement inutile à Ciel (garde les 2 meilleurs jets des pièces utiles)', OUI],
-      ['points', 'Répartition des points de caractéristiques', { fer: 'Lame de Fer : Physique 375 puis Vitalité', fersurvie: 'Lame de Fer survie (Kaguya) : Physique 200 puis Vitalité', senju: 'Chirurgien Senju : Esprit 300 puis Vitalité', esprit: 'Toute voie Esprit (Toxicologue, Sablier…) : Esprit 300 puis Vitalité', suiton: 'Domination (Suiton) : Suiton 300 puis Vitalité', cauchemar: 'Genjutsu Cauchemar : Esprit 300, Katon 200, puis Vitalité', aucun: 'Ne rien placer' }],
+      ['points', 'Répartition des points de caractéristiques', { fer: 'Lame de Fer : Physique 375 puis Vitalité', fersurvie: 'Lame de Fer survie (Kaguya) : Physique 200 puis Vitalité', senju: 'Chirurgien Senju : Esprit 300 puis Vitalité', esprit: 'Toute voie Esprit (Toxicologue, Sablier…) : Esprit 300 puis Vitalité', suiton: 'Domination (Suiton) : Suiton 300 puis Vitalité', cauchemar: 'Genjutsu Cauchemar : Esprit 300, Katon 200, puis Vitalité', espritmax: 'Tout en Esprit (le plus haut possible)', aucun: 'Ne rien placer' }],
       ['specFerme', 'Fermer les spectateurs à chaque combat', OUI],
       ['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt', OUI],
       ['coffreHoraire', 'Un coffre mystérieux par heure aussi en Farm / XP / Ryōs / Quêtes (sceau aller-retour)', OUI],
@@ -9337,7 +9340,7 @@
     const z = el('div');
     blocReg(z, 'Choix des combats', [['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt'], ['seuil', 'Chances de victoire minimum (%)'], ['meute', 'Taille maximum d’un groupe ennemi'], ['nivGroupe', 'Niveau total maximum d’un groupe (0 = chances calculées)'], ['nivGroupeMin', 'Niveau total minimum d’un groupe (0 = pas de minimum)'], ['zoneFarm', 'Zone de farm (mode Farm XP)'], ['allies', 'Combats de mon groupe'], ['suivreGroupe', 'AFK groupe : suivre un joueur du groupe'], ['suivreNom', 'Joueur à suivre'], ['specFerme', 'Fermer les spectateurs à chaque combat'], ['coffreOuvre', 'Ouvrir les coffres mystérieux']]);
     blocReg(z, 'Soins', [['soinEntre', 'Entre deux combats, se soigner sous'], ['achatSoins', 'Racheter des soins quand il en manque']], 'Contre un boss en groupe, Ciel joue soigneur : les alliés blessés passent avant ses coups.');
-    blocReg(z, 'Sorts', [['testTout', 'Tester chaque sort pour garder les meilleurs'], ['sansPhys', 'Retirer les techniques physiques (Force)'], ['suivis', 'Joueurs suivis dans les rapports']]);
+    blocReg(z, 'Sorts', [['testTout', 'Tester chaque sort pour garder les meilleurs'], ['sansPhys', 'Retirer les techniques physiques (Force)'], ['espritSeul', 'Seulement les techniques Esprit'], ['suivis', 'Joueurs suivis dans les rapports']]);
     blocReg(z, 'Rythme', [['rythme', 'Rythme'], ['delai', 'Secondes entre deux actions (0 à 3)']]);
     const der = (B.rapports || []).slice(-1)[0];
     z.append(el('div', 'sec', 'Dernier rapport de combat'));
