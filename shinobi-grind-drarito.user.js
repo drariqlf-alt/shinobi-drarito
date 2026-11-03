@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.94.0
+// @version     14.95.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.94-Drarito';
+  const VERSION = 'V14.95-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2394,6 +2394,16 @@
     if (!w || !h || w > 200 || h > 200) return;
     const cle = k.ox + ',' + k.oy + ',' + w + ',' + h + ',2'; // « ,2 » : version qui compte les objets posés
     try { if (!S.vus.has('portionDiag') && ((c.portals || []).length || c.zone)) { S.vus.add('portionDiag'); retiens('portion : portails et zone', JSON.stringify({ ox: k.ox, oy: k.oy, zone: c.zone, portals: (c.portals || []).slice(0, 5), spawn: (c.spawnPoints || []).slice(0, 2) }).slice(0, 900)); } } catch (e) {}
+    try { // V14.95 — passages d'une île à l'autre écrits dans la carte (le Maître des serpents vit sur l'Île des Mues, qui n'a pas de sceau)
+      (c.portals || []).forEach((x) => {
+        const to = String((x && (x.toMapId || x.mapId || x.to)) || ''); if (!to || /interieur|^donjon|^antre/.test(to) || typeof x.tileX !== 'number') return;
+        if (!S.vus.has('portailMonde')) { S.vus.add('portailMonde'); retiens('portail de carte (exemple)', JSON.stringify(x).slice(0, 400)); }
+        const wTo = /^world-/.test(to) ? to.split('@')[0].split(':')[0] : ((ZONES[to] || NOMS[to]) ? mondeDeZone(to) : null);
+        if (!wTo || wTo === GMONDE) return;
+        const P = B.passages = B.passages || {}, cleP = GMONDE + '>' + wTo, pos = { x: (k.ox + x.tileX) * 32 + 16, y: (k.oy + x.tileY) * 32 + 16, id: x.id || x.portalId || null, vers: to };
+        if (!P[cleP] || P[cleP].x !== pos.x || P[cleP].y !== pos.y) { P[cleP] = pos; sauveB(); note('Passage trouvé : de ' + GMONDE.replace(/^world-/, '') + ' vers ' + wTo.replace(/^world-/, '') + ' en ' + pos.x + ',' + pos.y); }
+      });
+    } catch (e) {}
     try { // portes des bâtiments écrites dans la carte : leur vraie place, utile depuis que les villages ont été redessinés
       (c.portals || []).forEach((x) => {
         const m = x && /interieur-(.+)$/.exec(String(x.toMapId || x.mapId || '')); if (!m || typeof x.tileX !== 'number') return;
@@ -3309,7 +3319,19 @@
       const wB = mondeBut(but, zoneBut);
       if (wB && wB !== S.mapId) { // V14.94 — le but est sur une autre île : sceau de cette île, quelle que soit la « distance » (elle ne veut rien dire d'une île à l'autre)
         const sp = sceauPourDrarito(Object.assign({}, but, { w: wB, z: zoneBut || but.z }));
-        if (!sp) { if (!S.vus.has('ileSans:' + wB)) { S.vus.add('ileSans:' + wB); note('Le but est sur ' + wB.replace(/^world-/, '') + ' et je n’y ai aucun sceau découvert : je ne peux pas y aller pour l’instant'); } return false; }
+        if (!sp) {
+          const pa = passageVers(wB);
+          if (pa) { // V14.95 — pas de sceau là-bas, mais je connais le passage : j'y marche et je le prends
+            if (dist(pa, S.pos) > 96) { statut('Passage vers ' + wB.replace(/^world-/, '') + ' · ' + Math.round(dist(pa, S.pos)) + ' px', true); if (!navigue({ x: pa.x, y: pa.y })) stop(); return true; }
+            stop(); note('Je prends le passage vers ' + wB.replace(/^world-/, ''));
+            if (pa.id) envoie('world.portal', { mapId: S.mapId, portalId: pa.id });
+            const r2 = await attend((ev) => ev === 'world.joined', 3000); await dort(600); NAV.route = []; NAV.but = null; NAV.prog = null;
+            if (!r2) { bouge({ x: Math.sign(pa.x - S.pos.x) || 1, y: Math.sign(pa.y - S.pos.y) }); await dort(700); stop(); } // le jeu l'ouvre parfois en marchant dessus
+            return true;
+          }
+          if (!S.vus.has('ileSans:' + wB)) { S.vus.add('ileSans:' + wB); note('Le but est sur ' + wB.replace(/^world-/, '') + ' : je n’y ai aucun sceau découvert et je ne connais pas encore le passage — je fais mes autres quêtes en attendant'); }
+          return false;
+        }
         stop(); S.tpA = maintenant + 60000; statut('Sceau : voyage vers ' + sp.s.name);
         note('Sceau : le but est sur une autre île (' + wB.replace(/^world-/, '') + ') — voyage vers ' + (sp.s.name || sp.s.id));
         S.tpZone = true; try { envoie('teleport.remote', { destinationId: sp.s.id }); } finally { S.tpZone = false; }
@@ -4019,8 +4041,8 @@
         return null;
       }
       if (!l || !enMonde() || dist(l, S.pos) < 350 || S.pnjIgnore['zone:esp:' + k] > maintenant) return null;
-      if (q && basNivDrarito() && !atteignableQuete(l, l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
-        if (!(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1200000; (S.qRaison = S.qRaison || {})[q] = 'trop loin pour l’instant (aucun sceau découvert près de la cible)'; S.objTenu = null; note('Quête ' + q + ' : cible trop loin pour l’instant — je chasse autour de moi et j’y reviendrai'); }
+      if (q && basNivDrarito() && !atteignableQuete(Object.assign({ w: mondeBut({}, l.z) }, l), l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
+        if (!(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1200000; (S.qRaison = S.qRaison || {})[q] = (mondeBut({}, l.z) && mondeBut({}, l.z) !== S.mapId) ? 'sur une autre île (' + String(mondeBut({}, l.z)).replace(/^world-/, '') + ') sans sceau ni passage connu' : 'trop loin pour l’instant (aucun sceau découvert près de la cible)'; S.objTenu = null; note('Quête ' + q + ' : cible trop loin pour l’instant — je chasse autour de moi et j’y reviendrai'); }
         return null;
       }
       return { type: 'va', x: l.x, y: l.y, zoneId: l.z || null, w: l.z ? mondeBut({}, l.z) : null, zone: 'esp:' + k, label: (label || 'chasse') + ' (là où vit ' + ((B.especes[k] || {}).nom || k) + ')', q, sig };
@@ -6637,7 +6659,10 @@
   }
   // V14.90 — QUÊTES : toute la progression. Une cible de quête n'est plus mise de côté « trop loin » : même île → j'y vais (à pied ou en course auto,
   // jusqu'à 60 000 px), sinon le sceau découvert le plus proche de la cible (jusqu'à 25 000 px d'elle), sinon j'y vais quand même à pied.
+  const passageVers = (w) => (w && (B.passages || {})[S.mapId + '>' + w]) || null; // V14.95
   function atteignableQuete(p, zone) {
+    const wP = p && mondeBut(p, zone);
+    if (wP && enMonde() && wP !== S.mapId) return !!(sceauPourDrarito(Object.assign({}, p, { w: wP })) || passageVers(wP)); // V14.95 — autre île : un sceau ou un passage connu, sinon non
     if (atteignable(p, zone)) return true;
     if (!p || !S.pos) return true;
     if ((!p.w || p.w === S.mapId) && dist(p, S.pos) <= 60000 && !bloqueAppris(p) && !zoneTropHaute(p)) return true;
