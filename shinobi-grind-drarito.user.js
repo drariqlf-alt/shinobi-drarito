@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.97.0
+// @version     14.98.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.97-Drarito';
+  const VERSION = 'V14.98-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -916,7 +916,7 @@
     B.boss = B.boss || {};
     const b = B.boss[k] = B.boss[k] || {}, now = Date.now(), rs = (CAT[k] || {}).rs || RS_RANG.boss;
     const sig0 = b.etat + '|' + b.retour + '|' + b.x;
-    if (typeof v.x === 'number' && !/^(donjon|antre)-|interieur/.test(String(S.mapId))) { b.x = Math.round(v.x); b.y = Math.round(v.y); }
+    if (typeof v.x === 'number' && !/^(donjon|antre)-|interieur/.test(String(S.mapId))) { b.x = Math.round(v.x); b.y = Math.round(v.y); b.w = S.mapId; } // V14.98 — avec son île
     const fin = [m.respawnAt, m.respawnsAt, m.upAt, m.availableAt, m.downUntil, m.respawnTime].find((n) => typeof n === 'number' && n > 1e12);
     if (v.down) {
       if (fin) { b.retour = fin; b.sur = 1; }
@@ -932,7 +932,7 @@
   }
   function lieuBoss(k) {
     const b = (B.boss || {})[k];
-    if (b && b.x != null) return { x: b.x, y: b.y, exact: true };
+    if (b && b.x != null && (b.w || !enMonde())) return { x: b.x, y: b.y, exact: true, w: b.w }; // V14.98 — position d'île inconnue (ancienne) : je m'en remets au plan des zones
     let mieux = null;
     Object.keys(ZONES).forEach((z) => Object.keys(ZONES[z].m).forEach((mk) => {
       if (mk.indexOf(k) < 0 || bossCle(mk) !== k) return;
@@ -1161,7 +1161,7 @@
     adv.filter((e) => e.kind === 'mob').forEach((e) => {
       const k = e.mobId || e.name;
       B.especes[k] = Object.assign(B.especes[k] || { n: 0 }, { nom: e.name, niv: e.level || 0, hp: e.maxHp || e.hp });
-      if (enMonde() && S.pos && !repris) B.especes[k].lieu = { x: Math.round(S.pos.x), y: Math.round(S.pos.y) };
+      if (enMonde() && S.pos && !repris) { const zc = String(S.combat.cible || '').split('/')[0]; B.especes[k].lieu = { x: Math.round(S.pos.x), y: Math.round(S.pos.y), w: S.mapId }; if (zc && (ZONES[zc] || NOMS[zc])) B.especes[k].lieu.z = zc; } // V14.98 — l'île où je l'ai combattu
     });
     if (S.combat.cible && S.combat.especes.length) {
       B.ids[S.combat.cible] = S.combat.especes; B.ids[cleId(S.combat.cible)] = S.combat.especes;
@@ -1339,6 +1339,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV27 !== 1) { CFG.drV27 = 1; sauve(); let n = 0; Object.keys(B.especes || {}).forEach((k) => { const L = B.especes[k] && B.especes[k].lieu; if (L && !L.w) { delete B.especes[k].lieu; n++; } }); Object.keys(B.boss || {}).forEach((k) => { if (B.boss[k] && B.boss[k].x != null && !B.boss[k].w) { delete B.boss[k].x; delete B.boss[k].y; } }); sauveB(); note('Carte : ' + n + ' coins de chasse sans île connue oubliés (ils se réapprennent au premier combat) — fini les trajets vers une autre île à pied'); } // V14.98
       if (estDrarito() && CFG.drV26 !== 1) { CFG.drV26 = 1; if (CFG.suivreGroupe == null) CFG.suivreGroupe = 1; sauve(); } // V14.89
       if (estDrarito() && CFG.drV25 !== 1) { CFG.drV25 = 1; CFG.nivGroupe = 640; if (!CFG.nivGroupeMin) CFG.nivGroupeMin = 480; S.cibleId = null; sauve(); note('Drarito : groupes de ' + CFG.nivGroupeMin + ' à 640 niveaux au total (700 trop dur)'); } // V14.88
       if (estDrarito() && CFG.drV24 !== 1) { CFG.drV24 = 1; Object.assign(CFG, { mode: 'xp', farmPreset: 'farm-ici', zoneFarm: '@ici', farmAncre: null, nivGroupeMin: 480, nivGroupe: 640 }); S.cibleId = null; S.spotVise = null; S.ezf = null; sauve(); note('Drarito : Farm ici — la zone où je suis (Terres des prêtresses) sera retenue dès que je vois ses ennemis · groupes de 480 à 640 niveaux'); } // V14.87
@@ -3023,7 +3024,14 @@
     if (!(await franchit(connu || { mapId: S.mapId, portalId: 'sortie-' + b }, 'Sortie du bâtiment', but, { x: 0, y: 1 }))) {
       S.sortieEchecs = (S.sortieEchecs || 0) + 1;
       if (S.sortieEchecs >= 5) { S.on = false; memoriseOn(); note('Je n’arrive pas à sortir du bâtiment : sortez à la main puis relancez le bot.'); }
-    } else S.sortieEchecs = 0;
+    } else {
+      S.sortieEchecs = 0;
+      try { if (enMonde() && S.pos) { // V14.98 — à peine sorti, la route repassait par la porte et me faisait rentrer : la porte est fermée pour moi 45 s, et je fais un pas pour m'en écarter
+        const t = { x: Math.floor(S.pos.x / 32), y: Math.floor(S.pos.y / 32) }, fin = Date.now() + 45000;
+        for (let dy = -3; dy <= -1; dy++) for (let dx = -1; dx <= 1; dx++) NAV.murs.set((t.x + dx) + ',' + (t.y + dy), fin);
+        NAV.calcul = 0; NAV.memo.clear(); NAV.route = []; S.recul = { x: 0, y: 1, fin: Date.now() + 500 };
+      } } catch (e) {}
+    }
   }
   // Plan de chaque zone (ennemis, PNJ, portes) en coordonnées locales : dès qu'un ennemi d'une zone est vu, on connaît
   // la place exacte de la zone dans le monde, donc celle de ses PNJ et de l'antre de son bijū.
@@ -3158,7 +3166,7 @@
   }
   function lieuPlan(id) { // position d'un PNJ d'après le plan de sa zone
     const z = NPCZ[id], o = z && origineZone(z);
-    return o ? { x: o.x + ZONES[z].n[id][0], y: o.y + ZONES[z].n[id][1], exact: !o.approx, proche: !!o.approx } : null;
+    return o ? { x: o.x + ZONES[z].n[id][0], y: o.y + ZONES[z].n[id][1], exact: !o.approx, proche: !!o.approx, z } : null; // V14.98 — avec sa zone (donc son île)
   }
   function lieuPNJ(id) {
     const de = enMonde() && entreesDj().find((x) => x && x.npcId === id && typeof x.x === 'number' && (!x.w || x.w === S.mapId || x.w === 'world-exterieur'));
@@ -3856,6 +3864,7 @@
       if (!e || !e.lieu || !(e.xp > 0) || !(e.duree > 0) || !(e.n >= 2) || !e.niv || e.niv < S.niveau - 14 || e.niv > S.niveau + 5 || (e.perdu || 0) > 0.5 * mx || (CAT[k] || {}).rang === 'boss' || S.pnjIgnore['zone:esp:' + k] > now) return;
       if ((B.dangers || []).some((d) => d.niv > S.niveau + 5 && Math.abs(d.x - e.lieu.x) < 1500 && Math.abs(d.y - e.lieu.y) < 1500)) return;
       if (estDrarito() && zoneInterdite(e.lieu)) return; // Drarito — coin de chasse où je n'arrive pas à aller
+      if (enMonde() && (!e.lieu.w || e.lieu.w !== S.mapId)) return; // V14.98 — coin de chasse d'une autre île (ou d'île inconnue) : ses coordonnées ne valent rien ici
       if (aokiriVeut() && !dansAokiri(e.lieu)) return; // Drarito — option Aokiri : coins de chasse du Pays de l'Eau tant qu'un coffre ou une quête m'y attend
       if (basNivDrarito() && !atteignable(e.lieu, e.lieu.z)) return; // Drarito — coin de chasse que je ne sais pas rejoindre
       const dM = dist(e.lieu, S.pos), trajet = Number(CFG.sceaux) && dM > 4500 ? 30 + 1800 / (S.vitesse || 150) : dM / (S.vitesse || 150);
@@ -4064,11 +4073,11 @@
         return null;
       }
       if (!l || !enMonde() || dist(l, S.pos) < 350 || S.pnjIgnore['zone:esp:' + k] > maintenant) return null;
-      if (q && basNivDrarito() && !atteignableQuete(Object.assign({ w: mondeBut({}, l.z) }, l), l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
-        if (!(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1200000; (S.qRaison = S.qRaison || {})[q] = (mondeBut({}, l.z) && mondeBut({}, l.z) !== S.mapId) ? 'sur une autre île (' + String(mondeBut({}, l.z)).replace(/^world-/, '') + ') sans sceau ni passage connu' : 'trop loin pour l’instant (aucun sceau découvert près de la cible)'; S.objTenu = null; note('Quête ' + q + ' : cible trop loin pour l’instant — je chasse autour de moi et j’y reviendrai'); }
+      if (q && basNivDrarito() && !atteignableQuete(Object.assign({}, l, { w: mondeBut(l, l.z) }), l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
+        if (!(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1200000; (S.qRaison = S.qRaison || {})[q] = (mondeBut(l, l.z) && mondeBut(l, l.z) !== S.mapId) ? 'sur une autre île (' + String(mondeBut(l, l.z)).replace(/^world-/, '') + ') sans sceau ni passage connu' : 'trop loin pour l’instant (aucun sceau découvert près de la cible)'; S.objTenu = null; note('Quête ' + q + ' : cible trop loin pour l’instant — je chasse autour de moi et j’y reviendrai'); }
         return null;
       }
-      return { type: 'va', x: l.x, y: l.y, zoneId: l.z || null, w: l.z ? mondeBut({}, l.z) : null, zone: 'esp:' + k, label: (label || 'chasse') + ' (là où vit ' + ((B.especes[k] || {}).nom || k) + ')', q, sig };
+      return { type: 'va', x: l.x, y: l.y, zoneId: l.z || null, w: mondeBut(l, l.z), zone: 'esp:' + k, label: (label || 'chasse') + ' (là où vit ' + ((B.especes[k] || {}).nom || k) + ')', q, sig };
     };
     const prendre = () => ({ type: 'talk', npc: dispo.npc, label: 'prendre une quête ' + (NOM_RANG[dispo.r] || 'à XP') });
     let attente = null, differe = null;
@@ -4129,7 +4138,7 @@
           // Rien qui « compte » par ici : on va vers l'espèce connue la plus proche qui a le bon niveau.
           const nMin = Math.max(1, S.niveau - (o.kind === 'significantWin' ? 8 : 14));
           const k = Object.keys(B.especes).filter((e) => B.especes[e].lieu && B.especes[e].niv >= nMin && B.especes[e].niv <= S.niveau + (o.kind === 'significantWin' ? 6 : 2) && !(S.pnjIgnore['zone:esp:' + e] > maintenant))
-            .sort((a, b) => dist(B.especes[a].lieu, S.pos) - dist(B.especes[b].lieu, S.pos))[0];
+            .sort((a, b) => { const c = (k) => { const L = B.especes[k].lieu, w = mondeBut(L, L.z); return (w && w !== S.mapId ? 1e7 : 0) + dist(L, S.pos); }; return c(a) - c(b); })[0]; // V14.98 — mon île d'abord
           const v = k && vaVers(k, o.label || def.name, q.questId, sig);
           if (v && ordreQuete(q.questId) === 0) { S.qPref = q.questId; return v; } // quête de clan : priorité numéro un, j'y vais tout de suite
           if (v && !differe) differe = v; // gardé pour la fin : seulement si aucune autre quête n'a rien à faire
