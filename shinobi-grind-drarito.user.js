@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.90.0
+// @version     14.91.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.90-Drarito';
+  const VERSION = 'V14.91-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -884,10 +884,10 @@
     especes.forEach((k) => {
       const e = CAT[k] || B.especes[k] || {}, niv = e.niv || moy, estBiju = /bijuu|matatabi|shukaku|isobu|son-goku|kokuo|saiken|chomei|gyuki|kurama/i.test(String(k));
       const w = estBiju ? 12 : POIDS_RANG[e.rang] || 1;
-      b += w * Math.min(1.5, Math.max(0.5, Math.pow(niv / moy, 2)));
+      b += w * Math.pow(Math.min(1.5, Math.max(0.5, niv / moy)), 2); // V14.91 — comme le jeu : le rapport de niveaux est borné à 0,5-1,5 puis élevé au carré
       if (niv > moy - 15) tousFaibles = false;
       if (estBiju) biju = true;
-      if (/boss/i.test(String(e.rang)) && Math.abs(niv - moy) <= 5) bossProche = true;
+      if (/boss/i.test(String(e.rang)) && niv >= moy - 5) bossProche = true; // V14.91 — comme le jeu : un boss pas plus de 5 niveaux sous moi
     });
     return { b: b / Math.pow(Math.max(1, joueurs || 1), 0.8), tousFaibles, biju, bossProche };
   }
@@ -3459,7 +3459,12 @@
   // Quête de mon village : mission du Kage (« mission-kumo-… » pour Kumo) ou quête donnée par un habitant du village. Toujours faite, même faible.
   const deMonVillage = (id) => { if (!S.village) return false; if (new RegExp('^mission-' + S.village + '-').test(String(id))) return true; const g = (S.q.defs.get(id) || {}).giver; const z = g && NPCZ[g]; return !!(z && (z === 'village-de-' + S.village || z === S.village + '-village')); };
   function queteRentable(id) {
-    if (estDrarito()) return true; // Drarito — toutes les quêtes valent la peine : les quêtes d'abord, la chasse seulement quand aucune n'est faisable
+    if (estDrarito()) { // V14.91 — Drarito : toutes les quêtes de clan (et les passages de grade), puis seulement les quêtes à partir du niveau 100 (réglable), les plus rentables en XP d'abord
+      const d = S.q.defs.get(id) || {};
+      if (/^(examen|grade|promotion)-/.test(id) || d.grade) return true;
+      if (/^heritage-/.test(id) || d.heritage || d.clan) return !autreClan(id);
+      return nivQuete(id) >= (CFG.queteNivMin == null || CFG.queteNivMin === '' ? 100 : Number(CFG.queteNivMin) || 0);
+    }
     if (rang(id) <= 1 || deMonVillage(id) || villagePrio(id) || quotidienne(id)) return true;
     const xp = xpQuete(id) || 0;
     let best = 0;
@@ -3523,8 +3528,8 @@
     } catch (e) { return false; }
   }
   // Drarito — la quête la plus proche d'abord : l'XP compte, mais divisée fortement par la distance (à 4 000 px : ÷4, à 12 000 px : ÷16, hors de portée : presque rien).
-  const xpPondere = (id) => { const xp = xpQuete(id); if (!estDrarito()) return xp; const d = distDonneur(id); return xp / Math.pow(1 + d / 4000, 2); };
-  const cleQuete = (id) => (ordreQuete(id) + (autreVillage(id) || autreClan(id) ? 4 : 0)) * 1e9 - Math.min(9e8, xpPondere(id));
+  const xpPondere = (id) => { const xp = xpQuete(id); if (!estDrarito()) return xp; const d = distDonneur(id); return xp / (1 + d / 40000); }; // V14.91 — l'XP d'abord, peu importe la distance : à XP proche, la plus près passe avant (ordre le plus rapide)
+  const cleQuete = (id) => { const o = ordreQuete(id), oo = estDrarito() && o === 2 ? 3 : o; return (oo + (autreVillage(id) || autreClan(id) ? 4 : 0)) * 1e9 - Math.min(9e8, xpPondere(id)); }; // V14.91 — Drarito : après le clan, les quêtes de village ne passent plus devant les quêtes qui rapportent plus d'XP
   const NOM_RANG = ['de clan', 'de grade', 'de village', 'à XP'];
   // ----- Bijū : quand le jeu en annonce un réveillé et à ma mesure, on y va. -----
   const QUEUES = { shukaku: 1, matatabi: 2, isobu: 3, 'son-goku': 4, songoku: 4, son: 4, kokuo: 5, saiken: 6, chomei: 7, gyuki: 8, kurama: 9 };
@@ -4021,12 +4026,18 @@
             if (mieuxX) { mieuxX.mob.est = estime(mieuxX.mob, S.maxHp); if (!S.vus.has('xcible:' + mieuxX.mob.id)) { S.vus.add('xcible:' + mieuxX.mob.id); note('Combat extrême possible : ' + nomMob(mieuxX.mob) + ' (score prévu ' + mieuxX.sc.score.toFixed(1) + ', ' + Math.round(100 * mieuxX.p) + ' % de chances)'); } S.qPref = q.questId; return { type: 'kill', m: mieuxX.mob, label: o.label || def.name, q: q.questId, sig }; }
             continue;
           }
-          const m = choisis(null, o.kind === 'significantWin' ? Math.max(1, S.niveau - 12) : Math.max(1, S.niveau - 14), o.kind === 'significantWin' ? 3 : 0) || (o.kind === 'significantWin' ? choisis(null, Math.max(1, S.niveau - 12), 2) || choisis(null, Math.max(1, S.niveau - 12)) : null);
+          let m = null;
+          if (o.kind === 'significantWin') { // V14.91 — la formule exacte du jeu : je n'attaque que des groupes qui comptent vraiment (avant, il enchaînait des crabes niv. 120 à 15 niveaux sous moi : 0/3 pendant 20 min)
+            const dur = /DIFFICULT/i.test(String(o.atLeast || ''));
+            const parmi = [...S.mobs.values()].filter((mob) => { if (mob.down || mob.combat || typeof mob.x !== 'number') return false; const es = especesDe(mob); if (!es || !es.length) return false; const nv = (k) => (CAT[k] || B.especes[k] || {}).niv, nc = nv(es[0]); if (!nc && !es.every(nv)) return false; /* niveau inconnu : je ne devine pas (sinon un groupe faible passerait pour « à mon niveau ») */ const c = classeCombat(es.map((k) => (nv(k) ? k : es[0])), 0, 1).c; return dur ? (c === 'difficile' || c === 'extrême') : (c !== 'sans importance'); });
+            m = parmi.length ? choisis(null, 0, -1, parmi) : null;
+            if (!m && !S.vus.has('sigAucun:' + q.questId + ':' + S.niveau)) { S.vus.add('sigAucun:' + q.questId + ':' + S.niveau); note('Quête « ' + (o.label || def.name) + ' » : un combat ne compte que si le score du jeu atteint ' + (dur ? '2,5 (Difficile)' : '0,6 (Normal)') + ' et qu’au moins un ennemi est à moins de 15 niveaux sous moi — je cherche un tel groupe'); }
+          } else m = choisis(null, Math.max(1, S.niveau - 14), 0);
           if (m) { S.qPref = q.questId; return { type: 'kill', m, label: o.label || def.name, q: q.questId, sig }; }
           if (!attente) attente = { type: 'attente', label: o.label };
           // Rien qui « compte » par ici : on va vers l'espèce connue la plus proche qui a le bon niveau.
-          const nMin = Math.max(1, S.niveau - 14);
-          const k = Object.keys(B.especes).filter((e) => B.especes[e].lieu && B.especes[e].niv >= nMin && B.especes[e].niv <= S.niveau + 2 && !(S.pnjIgnore['zone:esp:' + e] > maintenant))
+          const nMin = Math.max(1, S.niveau - (o.kind === 'significantWin' ? 8 : 14));
+          const k = Object.keys(B.especes).filter((e) => B.especes[e].lieu && B.especes[e].niv >= nMin && B.especes[e].niv <= S.niveau + (o.kind === 'significantWin' ? 6 : 2) && !(S.pnjIgnore['zone:esp:' + e] > maintenant))
             .sort((a, b) => dist(B.especes[a].lieu, S.pos) - dist(B.especes[b].lieu, S.pos))[0];
           const v = k && vaVers(k, o.label || def.name, q.questId, sig);
           if (v && ordreQuete(q.questId) === 0) { S.qPref = q.questId; return v; } // quête de clan : priorité numéro un, j'y vais tout de suite
@@ -9052,6 +9063,7 @@
       ['sansPhys', 'Techniques physiques (Force) : les retirer de la barre et ne jamais y mettre de points', OUI],
       ['djSinon', 'Mode Donjons, sans donjon faisable', { cles: 'Farmer la clef du meilleur donjon', attendre: 'Attendre sur place', xp: 'XP en attendant' }],
       ['quete', 'Quête à faire en premier', () => { const o = { '': 'Automatique (ordre du bot)' }; S.q.liste.filter((q) => q.status === 'active').forEach((q) => { o[q.questId] = ((S.q.defs.get(q.questId) || {}).name || q.questId).slice(0, 46); }); if (CFG.quete && !o[CFG.quete]) o[CFG.quete] = CFG.quete; return o; }],
+      ['queteNivMin', 'Quêtes à XP : niveau minimum (les quêtes de clan et de grade sont toujours faites)', { 100: 'Niveau 100 et plus', 120: 'Niveau 120 et plus', 80: 'Niveau 80 et plus', 0: 'Toutes' }],
       ['villagesPrio', 'Quêtes prioritaires (villages)', { 'kumo,iwa,ame': 'Kumo, Iwa et Ame', 'kumo': 'Kumo seulement', '': 'Aucun village (ordre normal)' }],
       ['quotidiennes', 'Faire toutes les missions quotidiennes (réputation)', OUI],
       ['boss', 'Boss à tuer (mode Boss)', () => { const o = { tous: 'Tous : le premier disponible' }; try { listeBoss().forEach((b) => { o[b.k] = b.nom + ' niv.' + b.niv; }); } catch (e) {} if (CFG.boss && !o[CFG.boss]) o[CFG.boss] = CFG.boss; return o; }]]],
@@ -9142,7 +9154,7 @@
       else if (CFG.mode === 'donjons') { blocReg(ctx, 'Donjons', [['djChoisi', 'Donjon à enchaîner'], ['djMarge', 'Niveaux d’avance voulus sur le donjon'], ['djSinon', 'Si aucun donjon n’est faisable']]);
         const v = CFG.djChoisi, ko = v && (B.djKO || {})[v] > Date.now(), pd = v && (B.djPerdu || {})[v];
         if (ko || pd) { const b = el('button', 'b large', '▶ Relancer ' + nomDj(v) + ' maintenant (en pause ' + (ko ? Math.ceil((B.djKO[v] - Date.now()) / 60000) + ' min' : 'jusqu’au niveau ' + pd) + ')'); b.onclick = () => { if (B.djKO) delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; if (S.djRefus) S.djRefus[v] = 0; sauveB(); note('Donjon ' + nomDj(v) + ' : pause levée à la main'); b.textContent = 'Pause levée ✓'; b.disabled = true; }; ctx.append(b); } }
-      else if (CFG.mode === 'quetes') { blocReg(ctx, 'Quêtes', [['villagesPrio', 'Villages prioritaires'], ['quotidiennes', 'Missions quotidiennes (réputation)']]); ctx.append(el('div', 'sec', 'Quêtes en cours')); quetes = corpsQuetes(); ctx.append(quetes.el); quetes.maj(); }
+      else if (CFG.mode === 'quetes') { blocReg(ctx, 'Quêtes', [['queteNivMin', 'Quêtes à XP : niveau minimum'], ['villagesPrio', 'Villages prioritaires'], ['quotidiennes', 'Missions quotidiennes (réputation)']]); ctx.append(el('div', 'sec', 'Quêtes en cours')); quetes = corpsQuetes(); ctx.append(quetes.el); quetes.maj(); }
       if (estDrarito()) blocReg(ctx, 'Pays de l’Eau (Aokiri)', [['aokiri', 'Option Aokiri']], 'Oui : coffres mystérieux du Pays de l’Eau dès qu’un est permis (un par heure), sinon les quêtes du Pays de l’Eau, sinon farm des groupes de monstres. Laissez le mode sur Quêtes. Non : quêtes sur tout le continent.'); // V14.58 — l'option était cachée
       blocReg(ctx, 'En chemin', [['courseAuto', 'Course auto du jeu (itinéraire entier)'], ['sceaux', 'Voyager par les sceaux (sinon tout à pied)'], ['donjons', 'Faire les donjons dont j’ai la clef'], ['biju', 'Aller aux antres de bijū ouverts'], ['sceauxDecouvre', 'Découvrir les sceaux manquants'], ['tournee', 'Tournée des sceaux (puis quêtes)'], ['enigmes', 'Résoudre les énigmes des marchands'], ['evAller', 'M’emmener aux événements signalés (sans rien ramasser)']]);
       { // V14.0 — énigmes des marchands ambulants
