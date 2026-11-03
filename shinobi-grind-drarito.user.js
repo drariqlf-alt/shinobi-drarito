@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.86.0
+// @version     14.87.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.86-Drarito';
+  const VERSION = 'V14.87-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1325,6 +1325,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV24 !== 1) { CFG.drV24 = 1; Object.assign(CFG, { mode: 'xp', farmPreset: 'farm-ici', zoneFarm: '@ici', farmAncre: null, nivGroupeMin: 480, nivGroupe: 700 }); S.cibleId = null; S.spotVise = null; S.ezf = null; sauve(); note('Drarito : Farm ici — la zone où je suis (Terres des prêtresses) sera retenue dès que je vois ses ennemis · groupes de 480 à 700 niveaux'); } // V14.87
       if (estDrarito() && CFG.drV23 !== 1) { CFG.drV23 = 1; CFG.courseAuto = 1; sauve(); } // V14.86
       if (estDrarito() && CFG.drV22 !== 1) { CFG.drV22 = 1; if (CFG.farmPreset === 'farm-tourbillon' || /uzushio|tourbillon/.test(String(CFG.zoneFarm || ''))) { Object.assign(CFG, { nivGroupeMin: 450, nivGroupe: 608 }); S.cibleId = null; } sauve(); note('Drarito : Farm Île du Tourbillon — groupes de 450 à 608 niveaux au total'); } // V14.85
       if (estDrarito() && CFG.drV21 !== 1) { CFG.drV21 = 1; CFG.points = 'cauchemar'; S.depenseKO = 0; sauve(); note('Drarito : plan de points « Cauchemar » — Esprit 300, puis Katon 200 (vos sorts de feu : Fournaise, Lance, Explosion, Trait), puis Vitalité. Pour redistribuer les points déjà placés : « Refaire sa feuille » en jeu (gratuit), le bot replace tout seul.'); } // V14.83
@@ -1864,6 +1865,7 @@
   }
   function choisisZone() {
     if (!S.pos) return null;
+    resoudZoneIci();
     const now = Date.now(), mn = Number(CFG.nivGroupeMin) || 0, mxT = Number(CFG.nivGroupe) || 9999, motifs = [];
     let best = null, garde = null;
     S.mobs.forEach((m) => {
@@ -3727,6 +3729,7 @@
       const trajet = dist(lieu, S.pos) / (S.vitesse || 180), sc = parH * 1800 / (1800 + trajet); // trajet amorti sur 30 min de farm
       if (!best || sc > best.sc) best = { k: d.k, lieu, nom: c.nom || d.k, niv: c.niv, n: d.n, xph: parH, xpm: parH / 60, sc, mesure: mes };
     });
+    if (!best && zoneFarm() && CFG.farmAncre && dist(S.pos, CFG.farmAncre) > 1500 && !(S.pnjIgnore['zone:esp:ancre'] > now)) best = { k: 'ancre', lieu: CFG.farmAncre, nom: 'ma zone de farm', niv: '', n: 0, xph: 0, xpm: 0, sc: 0 }; // V14.87 — zone absente de ma carte : je reviens à l'endroit où je l'ai choisie
     return best;
   }
   function spotXP() {
@@ -8587,6 +8590,7 @@
   const PRESETS_FARM = {
     'farm-tourbillon': { zoneFarm: 'rivage-d-uzushio,ruines-du-clan-uzumaki,grand-tourbillon', nivGroupeMin: 450, nivGroupe: 608 },
     'farm-pluie': { zoneFarm: 'plaine-grise,tour-du-chef', nivGroupeMin: 150, nivGroupe: 250 },
+    'farm-ici': { zoneFarm: '@ici', farmAncre: null }, // V14.87 — la zone où je me trouve au moment du clic (bornes de niveau des Réglages)
   };
   const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', groupe: 'AFK groupe' };
   const court = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e4 ? Math.round(n / 1000) + ' k' : String(Math.round(n)));
@@ -8715,7 +8719,18 @@
   // V14.78 — ZONES DE FARM STRICTES : si je me retrouve loin de mes zones (téléporté, poussé, rappel), j'y retourne aussitôt,
   // par le sceau de la zone quand je l'ai découvert (même avec les sceaux coupés : c'est le seul voyage autorisé), sinon à pied.
   function rectZone(z) { const o = origineZone(z), Z = ZONES[z]; if (!o || !Z) return null; return { x0: o.x, y0: o.y, x1: o.x + (Z.w || 0) * 32, y1: o.y + (Z.h || 0) * 32 }; }
-  function distZonesFarm(p) { let d = Infinity; zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).forEach((z) => { const r = rectZone(z); if (!r) return; const dx = Math.max(r.x0 - p.x, 0, p.x - r.x1), dy = Math.max(r.y0 - p.y, 0, p.y - r.y1); d = Math.min(d, Math.hypot(dx, dy)); }); return d; }
+  // V14.87 — « Farm ici » : la zone est celle des ennemis qui m'entourent au moment où je l'active (même une zone récente, absente de ma carte).
+  function resoudZoneIci() {
+    if (CFG.zoneFarm !== '@ici' || !S.pos || !enMonde()) return;
+    const n = {}; S.mobs.forEach((m) => { if (typeof m.x !== 'number' || String(m.id).indexOf('/') < 0 || dist(m, S.pos) > 2500) return; const z = String(m.id).split('/')[0]; n[z] = (n[z] || 0) + 1; });
+    let z = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    if (!z) { try { z = zoneDe(S.pos) || (typeof JEU !== 'undefined' && JEU.zone) || null; } catch (e) { z = null; } }
+    if (!z) return;
+    CFG.zoneFarm = z; CFG.farmAncre = { x: Math.round(S.pos.x), y: Math.round(S.pos.y) }; S.ezf = null; sauve();
+    note('Farm ici : zone « ' + ((typeof NOMS !== 'undefined' && NOMS[z]) || z) + ' » retenue autour de ' + CFG.farmAncre.x + ',' + CFG.farmAncre.y + ' · groupes de ' + (CFG.nivGroupeMin || 0) + ' à ' + (CFG.nivGroupe || '∞') + ' niveaux au total');
+    try { tgDit('⚔️ Farm ici : ' + ((typeof NOMS !== 'undefined' && NOMS[z]) || z) + ' · groupes de ' + (CFG.nivGroupeMin || 0) + ' à ' + (CFG.nivGroupe || '∞') + ' niveaux.'); } catch (e) {}
+  }
+  function distZonesFarm(p) { let d = Infinity; resoudZoneIci(); if (CFG.farmAncre && zoneFarm() && zoneFarm() !== '@ici') d = Math.max(0, dist(p, CFG.farmAncre) - 4000); zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).forEach((z) => { const r = rectZone(z); if (!r) return; const dx = Math.max(r.x0 - p.x, 0, p.x - r.x1), dy = Math.max(r.y0 - p.y, 0, p.y - r.y1); d = Math.min(d, Math.hypot(dx, dy)); }); return d; }
   async function retourZone() {
     if (!zoneFarm() || S.combat || !enMonde() || !S.pos) return false;
     const now = Date.now(), d = distZonesFarm(S.pos);
@@ -9031,7 +9046,7 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['farm-ici', 'Farm ici', 'Reste farmer la zone où je suis maintenant · bornes de niveau des Réglages (480 à 700 au départ)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
     CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { if (PRESETS_FARM[k]) { Object.assign(CFG, PRESETS_FARM[k], { mode: 'xp', farmPreset: k }); S.spotVise = null; S.spotForce = null; S.ezf = null; } else { CFG.mode = k; CFG.farmPreset = ''; if (k === 'xp') CFG.zoneFarm = ''; } sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
