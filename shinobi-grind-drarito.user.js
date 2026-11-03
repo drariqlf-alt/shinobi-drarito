@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.95.0
+// @version     14.96.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.95-Drarito';
+  const VERSION = 'V14.96-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -649,7 +649,8 @@
   const FORMATS = {
     'combat.join': (c) => ({ combatId: String(c.combatId).slice(0, 64) }), // V14.90 — le bouton « Rejoindre » du combat de groupe
     'instance.switch': (c) => ({ instanceId: String(c.instanceId).slice(0, 64) }), // V14.90 — le choix d'instance du jeu (pour être dans la même que mon chef)
-    'party.locate': () => ({}), // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
+    'party.locate': () => ({}),
+    'ferry.skip': (c) => ({ id: String(c.id).slice(0, 64) }), // V14.96 — « passer la traversée » du bac (le bouton du jeu) // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
     'player.route': (c) => { if (!Array.isArray(c.points) || c.points.length < 1 || c.points.length > 96) throw new Error('itinéraire invalide'); return { seq: ent(c.seq), points: c.points.map((p) => { const x = Number(p.x), y = Number(p.y); if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > 1e5 || y > 1e5) throw new Error('point invalide'); return { x, y }; }), sprint: c.sprint === true }; }, // V14.86 — même format que le clic-pour-se-déplacer du jeu
     'world.interact': (c) => ({ targetId: txt(c.targetId) }),
@@ -1196,6 +1197,7 @@
       if (ev === 'party.positions' && d && Array.isArray(d.members)) { S.posGroupe = { t: Date.now(), m: new Map(d.members.map((x) => [x.id || x.playerId, { mapId: x.mapId, x: x.x, y: x.y }])) }; } // V14.89 // V14.25 — taille de mon groupe (pour les sorts de soutien)
       if (ev === 'player.spawn' && d) { const ref = d.ref != null ? d.ref : d.r, id = d.id || d.playerId; if (ref != null && id) { (S.refJ = S.refJ || new Map()).set(ref, { id, nom: d.name || '' }); if (typeof d.x === 'number') (S.posJ = S.posJ || new Map()).set(id, { x: d.x, y: d.y, t: Date.now() }); } if (!S.vus.has('spawnEx')) { S.vus.add('spawnEx'); retiens('player.spawn (exemple)', JSON.stringify(d).slice(0, 500)); } } // V14.90 — qui est qui sur la carte
       if (ev === 'player.despawn' && d && d.id && S.posJ) S.posJ.delete(d.id);
+      if (/^ferry\./.test(ev) && d) { const fid = d.id || d.ferryId || (d.ferry && d.ferry.id); if (fid) S.bac = { id: fid, ev, t: Date.now() }; if (!S.vus.has('bac:' + ev)) { S.vus.add('bac:' + ev); retiens('bac ' + ev, JSON.stringify(d).slice(0, 400)); } } // V14.96
       if (ev === 'party.fight' && d && d.combatId && !S.combat && CFG.mode !== 'brisage' && (CFG.mode === 'groupe' || CFG.allies === 'rejoindre') && (!(S.maxHp > 0) || S.hp >= 0.5 * S.maxHp) && !(S.joinDirect && S.joinDirect.id === d.combatId)) { // V14.90 — je rejoins tout de suite, sans attendre la fenêtre ni marcher
         S.joinDirect = { id: d.combatId, t: Date.now() }; S.joinA = Date.now(); stop();
         if (envoie('combat.join', { combatId: d.combatId })) { note('Je rejoins tout de suite le combat de ' + ((d.from || {}).name || '?') + ' contre ' + (d.enemy || '?')); try { tgAlerte('🤝 Je rejoins le combat de ' + ((d.from || {}).name || '?') + ' contre ' + (d.enemy || '?')); } catch (e) {} }
@@ -2451,6 +2453,7 @@
     GRILLE.fill(0); PASSE.fill(0); PAS.n = 0; PAS.tampon = []; PAS.der = null; PAS.sales.clear(); GSALE.clear(); CARTE = {};
     chargeBlocs();
     try { NAV.memo.clear(); NAV.route = []; NAV.murs.clear(); NAV.calcul = 0; NAV.prog = null; } catch (e) {}
+    try { Object.keys(S.qRaison || {}).forEach((q) => { if (/autre île|trop loin/.test(String(S.qRaison[q]))) { delete S.qPause[q]; delete S.qRaison[q]; } }); S.objTenu = null; } catch (e) {} // V14.96 — nouvelle île : les quêtes mises de côté « trop loin / autre île » sont réessayées tout de suite
     note('Carte : je passe de ' + avant.replace(/^world-/, '') + ' à ' + w.replace(/^world-/, '') + ' (' + Object.keys(GBLOCS).length + ' blocs connus sur cette île, ' + PAS.n + ' cases parcourues)');
   }
   const AG = new Float32Array(GW * GH), AP = new Int32Array(GW * GH), AS = new Uint32Array(GW * GH);
@@ -3320,6 +3323,26 @@
       if (wB && wB !== S.mapId) { // V14.94 — le but est sur une autre île : sceau de cette île, quelle que soit la « distance » (elle ne veut rien dire d'une île à l'autre)
         const sp = sceauPourDrarito(Object.assign({}, but, { w: wB, z: zoneBut || but.z }));
         if (!sp) {
+          const pasR = routeIle(wB);
+          if (pasR && pasR.type === 'sceau') { // V14.96 — un sceau vers une île d'où part un bac pour la bonne île
+            stop(); S.tpA = maintenant + 60000; note('Sceau : étape vers ' + wB.replace(/^world-/, '') + ' — ' + (pasR.s.name || pasR.s.id) + ' puis le bac');
+            S.tpZone = true; try { envoie('teleport.remote', { destinationId: pasR.s.id }); } finally { S.tpZone = false; }
+            await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500); await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
+            return true;
+          }
+          const bac = pasR && pasR.type === 'bac' ? pasR.p : null;
+          if (bac) { // V14.96 — un bac : je vais voir le passeur, j'embarque, je passe la traversée
+            if (dist(bac, S.pos) > 70) { statut('Bac vers ' + wB.replace(/^world-/, '') + ' : je vais voir le passeur · ' + Math.round(dist(bac, S.pos)) + ' px', true); if (!navigue({ x: bac.x, y: bac.y })) stop(); return true; }
+            if (maintenant < (S.bacA || 0)) return true;
+            S.bacA = maintenant + 20000; stop(); note('Bac : j’embarque chez le passeur vers ' + (NOMS[bac.zone] || bac.zone) + ' (' + bac.vers.replace(/^world-/, '') + ')');
+            S.bac = null; envoie('npc.talk', { npcId: bac.id }); await dort(1300);
+            envoie('npc.choose', { npcId: bac.id, optionId: 'passage:embarquer' });
+            await attend((ev) => /^ferry\./.test(ev) || ev === 'world.joined', 5000);
+            if (S.bac && S.bac.id) { await dort(600); envoie('ferry.skip', { id: S.bac.id }); }
+            await attend((ev) => ev === 'world.joined' || ev === 'ferry.ended', 15000); await dort(900);
+            NAV.route = []; NAV.but = null; NAV.prog = null;
+            return true;
+          }
           const pa = passageVers(wB);
           if (pa) { // V14.95 — pas de sceau là-bas, mais je connais le passage : j'y marche et je le prends
             if (dist(pa, S.pos) > 96) { statut('Passage vers ' + wB.replace(/^world-/, '') + ' · ' + Math.round(dist(pa, S.pos)) + ' px', true); if (!navigue({ x: pa.x, y: pa.y })) stop(); return true; }
@@ -3991,7 +4014,7 @@
     const maintenant = Date.now();
     const ok = (id) => !(S.pnjIgnore[id] > maintenant);
     const actives = S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant) && !autreClan(q.questId) && queteRentable(q.questId) && (!aokiriOn() || queteDansAokiri(q.questId)))
-      .sort((a, b) => ((b.questId === CFG.quete) - (a.questId === CFG.quete)) || ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || (Number(CFG.suivie) ? ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)) : 0) || (cleQuete(a.questId) - cleQuete(b.questId)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)));
+      .sort((a, b) => (estDrarito() ? ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) : 0) || ((b.questId === CFG.quete) - (a.questId === CFG.quete)) || ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || (Number(CFG.suivie) ? ((ordreQuete(b.questId) === 0) - (ordreQuete(a.questId) === 0)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)) : 0) || (cleQuete(a.questId) - cleQuete(b.questId)) || ((b.questId === S.qPref) - (a.questId === S.qPref)) || ((S.q.suivis.indexOf(b.questId) >= 0) - (S.q.suivis.indexOf(a.questId) >= 0)));
     // Grade : dès que le niveau est atteint et que le titre manque, on va voir le Kage du village avant tout.
     const KAGE = { kiri: 'npc-village-de-kiri-2' };
     const palier = [[125, 'elite'], [75, 'jonin'], [35, 'chunin']].find((x) => S.niveau >= x[0]);
@@ -6659,7 +6682,23 @@
   }
   // V14.90 — QUÊTES : toute la progression. Une cible de quête n'est plus mise de côté « trop loin » : même île → j'y vais (à pied ou en course auto,
   // jusqu'à 60 000 px), sinon le sceau découvert le plus proche de la cible (jusqu'à 25 000 px d'elle), sinon j'y vais quand même à pied.
-  const passageVers = (w) => (w && (B.passages || {})[S.mapId + '>' + w]) || null; // V14.95
+  // V14.96 — LES BACS (« Passeur ») : la seule façon d'aller sur certaines îles (l'Île des Mues n'a pas de sceau). Chaque passeur s'appelle
+  // « passeur-<zone de départ>--<zone d'arrivée> » ; je retiens où il est (comme tout PNJ) et je calcule l'enchaînement de bacs jusqu'à l'île voulue.
+  function passeurs() { const L = []; Object.keys(B.pnj || {}).forEach((id) => { const m = /^passeur-(.+?)--(.+)$/.exec(id), P = B.pnj[id]; if (!m || !P || typeof P.x !== 'number' || !/^world-/.test(String(P.carte || ''))) return; L.push({ id, x: P.x, y: P.y, w: String(P.carte).split(':')[0], vers: mondeDeZone(m[2]), zone: m[2], de: m[1] }); }); return L; }
+  function routeIle(w) { // V14.96 — le premier pas pour aller sur l'île w : un sceau (coût 1) ou un bac (coût 2, il faut marcher jusqu'au passeur), ou null
+    if (!w || !enMonde() || w === S.mapId) return null;
+    const L = passeurs(), sc = Number(CFG.sceaux) ? (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && !((B.tpKO || {})[x.id] > Date.now())) : [];
+    const best = new Map([[S.mapId, { c: 0, premier: null, pos: S.pos }]]), file = [S.mapId];
+    for (let n = 0; file.length && n < 200; n++) {
+      file.sort((a, b) => best.get(a).c - best.get(b).c); const ile = file.shift(), cur = best.get(ile);
+      const aretes = L.filter((p) => p.w === ile).map((p) => ({ vers: p.vers, c: 2 + (cur.zone && cur.zone === p.de ? 0.1 : cur.pos ? dist(cur.pos, p) / 15000 : 1), pas: { type: 'bac', p }, pos: null, zone: p.zone })); // la marche jusqu'au passeur compte
+      sc.forEach((x) => { const v = mondeDeZone(x.mapId); if (v !== ile) aretes.push({ vers: v, c: 1, pas: { type: 'sceau', s: x }, pos: lieuSceau(x), zone: x.mapId }); });
+      aretes.forEach((a) => { const c = cur.c + a.c, o = best.get(a.vers); if (!o || c < o.c) { best.set(a.vers, { c, premier: cur.premier || a.pas, pos: a.pos, zone: a.zone }); file.push(a.vers); } });
+    }
+    const r = best.get(w); return r && r.premier ? r.premier : null;
+  }
+  const bacVers = (w) => { const r = routeIle(w); return r && r.type === 'bac' ? r.p : null; };
+  const passageVers = (w) => (w && ((B.passages || {})[S.mapId + '>' + w] || routeIle(w))) || null; // V14.95 — passage écrit sur la carte, ou bac
   function atteignableQuete(p, zone) {
     const wP = p && mondeBut(p, zone);
     if (wP && enMonde() && wP !== S.mapId) return !!(sceauPourDrarito(Object.assign({}, p, { w: wP })) || passageVers(wP)); // V14.95 — autre île : un sceau ou un passage connu, sinon non
