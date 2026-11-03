@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     14.89.0
+// @version     14.90.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V14.89-Drarito';
+  const VERSION = 'V14.90-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -647,6 +647,8 @@
   const ent = (v) => { if (!Number.isInteger(v) || v < 0) throw new Error('nombre invalide'); return v; };
   const axe = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const FORMATS = {
+    'combat.join': (c) => ({ combatId: String(c.combatId).slice(0, 64) }), // V14.90 — le bouton « Rejoindre » du combat de groupe
+    'instance.switch': (c) => ({ instanceId: String(c.instanceId).slice(0, 64) }), // V14.90 — le choix d'instance du jeu (pour être dans la même que mon chef)
     'party.locate': () => ({}), // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
     'player.route': (c) => { if (!Array.isArray(c.points) || c.points.length < 1 || c.points.length > 96) throw new Error('itinéraire invalide'); return { seq: ent(c.seq), points: c.points.map((p) => { const x = Number(p.x), y = Number(p.y); if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > 1e5 || y > 1e5) throw new Error('point invalide'); return { x, y }; }), sprint: c.sprint === true }; }, // V14.86 — même format que le clic-pour-se-déplacer du jeu
@@ -1189,9 +1191,15 @@
     // Groupe et combats d'alliés : j'apprends la forme exacte de ce que le jeu envoie (invitation, membres, combat à rejoindre) avant d'écrire l'option.
     try {
       S.nbGroupe = S.nbGroupe || 0;
-      if (ev === 'party.updated' && d) { const m = ((d.party || {}).members || []); S.groupeN = m.length; S.groupeMembres = m.map((x) => ({ id: x.id || x.playerId, nom: x.name || x.id || x.playerId, chef: !!x.leader || (d.party && d.party.leaderId === x.id), enLigne: x.online !== false })); }
+      if (ev === 'party.updated' && d) { const m = ((d.party || {}).members || []); S.groupeN = m.length; S.groupeMembres = m.map((x) => ({ id: x.id || x.playerId, nom: x.name || x.id || x.playerId, chef: !!x.leader || (d.party && d.party.leaderId === x.id), enLigne: x.online !== false, inst: x.instanceId || null })); }
       if (ev === 'party.left') { S.groupeMembres = []; S.groupeN = 0; S.posGroupe = null; }
       if (ev === 'party.positions' && d && Array.isArray(d.members)) { S.posGroupe = { t: Date.now(), m: new Map(d.members.map((x) => [x.id || x.playerId, { mapId: x.mapId, x: x.x, y: x.y }])) }; } // V14.89 // V14.25 — taille de mon groupe (pour les sorts de soutien)
+      if (ev === 'player.spawn' && d) { const ref = d.ref != null ? d.ref : d.r, id = d.id || d.playerId; if (ref != null && id) { (S.refJ = S.refJ || new Map()).set(ref, { id, nom: d.name || '' }); if (typeof d.x === 'number') (S.posJ = S.posJ || new Map()).set(id, { x: d.x, y: d.y, t: Date.now() }); } if (!S.vus.has('spawnEx')) { S.vus.add('spawnEx'); retiens('player.spawn (exemple)', JSON.stringify(d).slice(0, 500)); } } // V14.90 — qui est qui sur la carte
+      if (ev === 'player.despawn' && d && d.id && S.posJ) S.posJ.delete(d.id);
+      if (ev === 'party.fight' && d && d.combatId && !S.combat && CFG.mode !== 'brisage' && (CFG.mode === 'groupe' || CFG.allies === 'rejoindre') && (!(S.maxHp > 0) || S.hp >= 0.5 * S.maxHp) && !(S.joinDirect && S.joinDirect.id === d.combatId)) { // V14.90 — je rejoins tout de suite, sans attendre la fenêtre ni marcher
+        S.joinDirect = { id: d.combatId, t: Date.now() }; S.joinA = Date.now(); stop();
+        if (envoie('combat.join', { combatId: d.combatId })) { note('Je rejoins tout de suite le combat de ' + ((d.from || {}).name || '?') + ' contre ' + (d.enemy || '?')); try { tgAlerte('🤝 Je rejoins le combat de ' + ((d.from || {}).name || '?') + ' contre ' + (d.enemy || '?')); } catch (e) {} }
+      }
       if (ev === 'party.fight' && d && d.from) S.allieJoin = { fin: Date.now() + Math.max(3000, Math.min(30000, (d.joinableForMs || 15000) - 1500)), nom: d.from.name || '?', contre: d.enemy || '?', id: d.combatId };
       if (ev === 'party.fight' && d && d.from) note('Combat d’allié : ' + (d.from.name || '?') + ' contre ' + (d.enemy || '?') + (d.enemies ? ' (' + d.enemies + ' ennemis)' : '') + ' · rejoignable ' + Math.round((d.joinableForMs || 0) / 1000) + ' s');
       if (ev !== 'party.positions' && ev !== 'world.joined' && S.nbGroupe < 60 && ((S.grpVus = S.grpVus || {})[ev] = (S.grpVus[ev] || 0) + 1) <= 2 && (/^(party|group|squad)\.|join|assist|help|renfort|invit|ally|allie/i.test(ev))) { S.nbGroupe++; retiens('groupe ' + ev + ' #' + S.nbGroupe, JSON.stringify(d).slice(0, 900)); }
@@ -1315,6 +1323,7 @@
       note('Donjon : arrivée dans ' + d.mapId);
     }
     if (ev === 'world.joined') {
+      try { S.posJ = new Map(); const L = (d && (d.players || (d.world && d.world.players))) || []; if (Array.isArray(L)) L.forEach((x) => { const ref = x && (x.ref != null ? x.ref : x.r), id = x && (x.id || x.playerId); if (ref != null && id) { (S.refJ = S.refJ || new Map()).set(ref, { id, nom: x.name || '' }); if (typeof x.x === 'number') S.posJ.set(id, { x: x.x, y: x.y, t: Date.now() }); } }); } catch (e) {} // V14.90
       S.self = { id: d.self.id, ref: d.self.ref, name: d.self.name };
       if (changePerso(d.self.id, d.self.name)) return;
       if (!estCiel() && CFG.profil !== 'ami' && CFG.profil !== 'drarito') { // V14.41 — autre personnage (bot prêté) : rien de ce qui est réglé pour Ciel ne touche à son stuff ni à ses points
@@ -1424,7 +1433,7 @@
       if (!S.on && repriseVoulue()) { S.on = true; S.ancre = { x: S.pos.x, y: S.pos.y }; if (!S.debut) S.debut = Date.now(); note('Reprise automatique après reconnexion'); }
   try { const dg = localStorage.getItem('__sg_diag'); if (dg) { localStorage.removeItem('__sg_diag'); note('AVANT LE RECHARGEMENT :\n' + dg); } } catch (e) {}
     } else if (ev === 'world.snapshot') {
-      if (S.self && Array.isArray(d.players)) d.players.forEach((p) => { if (p.ref === S.self.ref) { const av = S.pos; S.pos = { x: p.x, y: p.y }; try { retourArriere(av, S.pos); } catch (e) {} } });
+      if (S.self && Array.isArray(d.players)) d.players.forEach((p) => { if (p.ref === S.self.ref) { const av = S.pos; S.pos = { x: p.x, y: p.y }; try { retourArriere(av, S.pos); } catch (e) {} } else if (S.refJ && S.refJ.has(p.ref) && typeof p.x === 'number') { (S.posJ = S.posJ || new Map()).set(S.refJ.get(p.ref).id, { x: p.x, y: p.y, t: Date.now() }); } });
       if (d && !S.vus.has('snapCles')) { S.vus.add('snapCles'); retiens('world.snapshot : champs', Object.keys(d).join(', ') + ' · ' + JSON.stringify(d).slice(0, 500)); }
       if (d && Array.isArray(d.mobs)) d.mobs.forEach((x) => { // positions des ennemis dans l'instantané : seulement la place, rien d'autre
         if (!x || typeof x.x !== 'number' || typeof x.y !== 'number') return;
@@ -2421,12 +2430,13 @@
     // je recalcule sans elle.
     const marge = estDrarito() && !libre && !sansMarge;
     const prochesFin = (i) => { const x = i % GW, y = (i / GW) | 0; return (Math.abs(x - dep.x) <= 2 && Math.abs(y - dep.y) <= 2) || (Math.abs(x - arr.x) <= 2 && Math.abs(y - arr.y) <= 2); };
-    const mb = (j) => GRILLE[j] === 2 && !PASSE[j]; // mur brut (rapide)
+    const mb = (j) => (GRILLE[j] === 2 && !PASSE[j]) || (aTmp && tmp.has(j)); // mur brut (rapide) — V14.90 : les obstacles heurtés récemment comptent aussi pour la marge
     const murA = (i, r) => { // un mur sur l'anneau de rayon r autour de la case i
       if (r === 1) return mb(i - GW - 1) || mb(i - GW) || mb(i - GW + 1) || mb(i - 1) || mb(i + 1) || mb(i + GW - 1) || mb(i + GW) || mb(i + GW + 1);
       const g = 2 * GW; for (let k = -2; k <= 2; k++) if (mb(i - g + k) || mb(i + g + k)) return true;
       for (let k = -1; k <= 1; k++) if (mb(i + k * GW - 2) || mb(i + k * GW + 2)) return true; return false;
     };
+    const murA3 = (i) => { const g = 3 * GW; for (let k = -3; k <= 3; k += 2) if (mb(i - g + k) || mb(i + g + k) || mb(i + k * GW - 3) || mb(i + k * GW + 3)) return true; return mb(i - g) || mb(i + g) || mb(i - 3) || mb(i + 3); }; // V14.90 — anneau de rayon 3 (échantillonné)
     const MEMO = marge ? new Map() : null; // une seule évaluation par case et par calcul
     const tropPres = (i) => { if (!marge || PASSE[i]) return false; let v = MEMO.get(i); if (v === undefined) { v = !prochesFin(i) && murA(i, 1); MEMO.set(i, v); } return v; };
     const h = (i) => { const dx = Math.abs((i % GW) - arr.x), dy = Math.abs(((i / GW) | 0) - arr.y); return Math.max(dx, dy) + 0.41 * Math.min(dx, dy); };
@@ -2454,11 +2464,12 @@
         if ((mr(ni) || tropPres(ni)) && ni !== but) continue;
         if (d > 3 && (mr(i + DX[d]) || mr(i + DY[d] * GW) || tropPres(i + DX[d]) || tropPres(i + DY[d] * GW))) continue; // pas de coupe en diagonale (ni contre un coin d'obstacle)
         let cout = d > 3 ? 1.41 : 1;
-        if (PASSE[ni]) cout *= 0.55; // déjà parcourue sans heurt : c'est la route qu'on préfère
+        if (PASSE[ni]) { cout *= 0.55; if (marge && murA(ni, 1)) cout += 1.2; } // déjà parcourue sans heurt : c'est la route qu'on préfère — V14.90 : sauf collée à un mur
         else {
           if (GRILLE[ni] === 0) cout += 0.6; // terrain jamais vu : possible, mais on préfère ce qu'on connaît
           if (mr(ni + 1) || mr(ni - 1) || mr(ni + GW) || mr(ni - GW)) cout += 1.5; // on évite de raser les murs
-          if (marge && murA(ni, 2)) cout += 2; // Drarito — deux cases avant l'obstacle : je m'écarte déjà
+          if (marge && murA(ni, 2)) cout += 3; // Drarito — deux cases avant l'obstacle : je m'écarte déjà
+          else if (marge && murA3(ni)) cout += 0.8; // V14.90 — trois cases avant : j'anticipe (murailles, maisons)
         }
         const ng = gc + cout;
         if (AS[ni] === aTour && AG[ni] <= ng) continue;
@@ -2771,6 +2782,8 @@
         if (NAV.anticipeT !== Math.floor(maintenant / 1500)) { NAV.anticipeT = Math.floor(maintenant / 1500); NAV.calcul = 0; NAV.memo.clear(); } // et je recalcule la route tout de suite
       } else if (loin && devant(3, dir) && NAV.anticipeT !== Math.floor(maintenant / 3000)) { NAV.anticipeT = Math.floor(maintenant / 3000); NAV.calcul = 0; } // obstacle à 3 cases : je recalcule déjà
     }
+    if (S.recul && Date.now() < S.recul.fin && !S.combat) { bouge({ x: S.recul.x, y: S.recul.y }); return true; } // V14.90 — un petit recul après un obstacle, pour ne pas rester plaqué contre
+    S.recul = null;
     if ((dir.x || dir.y) && courseAuto(c, vise)) return true; // V14.86 — course auto du jeu : un itinéraire entier au lieu d'une direction à la fois
     bouge(dir);
     return true;
@@ -2793,7 +2806,9 @@
     if (R && R.actif) {
       const avance = dist(S.pos, R.pos0) > 30 || dist(S.pos, R.posT) > 24;
       if (dist(S.pos, R.posT) > 24) { R.posT = { x: S.pos.x, y: S.pos.y }; R.tT = now; }
-      if (now - R.tT > 2500) { R.actif = false; S.courseKO = now + 10000; S.dir = null; if (!S.courseDitKO || now - S.courseDitKO > 120000) { S.courseDitKO = now; note('Course auto : le jeu ne me fait plus avancer ici (' + Math.round(S.pos.x) + ',' + Math.round(S.pos.y) + ') — je marche case par case 10 s'); } return false; }
+      if (now - R.tT > 1800) { // V14.90 — bloqué pendant la course auto : je marque comme mur la case devant moi et ses voisines, recul et nouvelle route
+        try { const t = { x: Math.floor(S.pos.x / 32), y: Math.floor(S.pos.y / 32) }; const nx = (NAV.route || []).find((q) => Math.max(Math.abs(q.x - t.x), Math.abs(q.y - t.y)) >= 1); if (nx) { const dx = Math.sign(nx.x - t.x), dy = Math.sign(nx.y - t.y); for (let av = 1; av <= 2; av++) for (let lat = -1; lat <= 1; lat++) NAV.murs.set((t.x + dx * av + (dy && !dx ? lat : 0)) + ',' + (t.y + dy * av + (dx && !dy ? lat : 0)), now + 180000); heurte(t.x + dx, t.y + dy); NAV.calcul = 0; NAV.memo.clear(); NAV.route = []; S.recul = { x: -dx, y: -dy, fin: now + 450 }; } } catch (e) {}
+        R.actif = false; S.courseKO = now + 2500; S.dir = null; if (!S.courseDitKO || now - S.courseDitKO > 120000) { S.courseDitKO = now; note('Course auto : obstacle en ' + Math.round(S.pos.x) + ',' + Math.round(S.pos.y) + ' — je le marque, je recule d’une case et je repars par une route plus large'); } return false; }
       const memeBut = dist(R.fin, fin) < 64 || dist(R.but, c) < 48;
       if (memeBut && dist(S.pos, R.fin) > 110 && now - R.t < 6000 && avance !== null) return true; // l'itinéraire en cours suffit
     }
@@ -3918,7 +3933,7 @@
     let dispo = null; // la meilleure quête à prendre : d'abord le rang, ensuite la distance
     if (S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant)).length < 6 && S.q.liste.filter((q) => q.status === 'active').length < 14) {
       const offre = (id) => Math.min(9e9, ...[...S.q.defs.values()].filter((d) => d.giver === id && (d.minLevel || 1) <= S.niveau && queteRentable(d.id) && !autreClan(d.id) && S.q.liste.some((q) => q.questId === d.id && q.status === 'available')).map((d) => cleQuete(d.id)));
-      dispo = Object.keys(m).filter((id) => m[id] === 'available' && ok(id)).map((id) => { const k = offre(id); return { npc: id, k, r: Math.ceil(k / 1e9) }; }).filter((x) => x.k < 9e9 && lieuPNJ(x.npc) && !(basNivDrarito() && x.r > 1 && !atteignable(lieuPNJ(x.npc), NPCZ[x.npc])) && (!aokiriOn() || dansAokiri(lieuPNJ(x.npc)))) // quêtes de clan et de grade : toujours faites, même loin (sauf option Aokiri : Pays de l'Eau seulement) // Drarito — sous le niveau 15 : pas de marche à travers le continent pour prendre une quête, je chasse autour de moi
+      dispo = Object.keys(m).filter((id) => m[id] === 'available' && ok(id)).map((id) => { const k = offre(id); return { npc: id, k, r: Math.ceil(k / 1e9) }; }).filter((x) => x.k < 9e9 && lieuPNJ(x.npc) && !(basNivDrarito() && x.r > 1 && !atteignableQuete(lieuPNJ(x.npc), NPCZ[x.npc])) && (!aokiriOn() || dansAokiri(lieuPNJ(x.npc)))) // quêtes de clan et de grade : toujours faites, même loin (sauf option Aokiri : Pays de l'Eau seulement) // Drarito — sous le niveau 15 : pas de marche à travers le continent pour prendre une quête, je chasse autour de moi
         .sort((a, b) => (a.k - b.k) || (dist(lieuPNJ(a.npc), S.pos) - dist(lieuPNJ(b.npc), S.pos)))[0] || null;
     }
     // Aucun ennemi voulu en vue : on retourne là où on en a déjà combattu.
@@ -3953,7 +3968,7 @@
         return null;
       }
       if (!l || !enMonde() || dist(l, S.pos) < 350 || S.pnjIgnore['zone:esp:' + k] > maintenant) return null;
-      if (q && basNivDrarito() && !atteignable(l, l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
+      if (q && basNivDrarito() && !atteignableQuete(l, l.z)) { // Drarito — cible de quête hors de portée (ni proche ni près d'un sceau découvert) : je la garde pour plus tard
         if (!(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1200000; (S.qRaison = S.qRaison || {})[q] = 'trop loin pour l’instant (aucun sceau découvert près de la cible)'; S.objTenu = null; note('Quête ' + q + ' : cible trop loin pour l’instant — je chasse autour de moi et j’y reviendrai'); }
         return null;
       }
@@ -6563,6 +6578,14 @@
     const t = B.barrieres[celluleNav(S.pos, 3000) + '>' + celluleNav(p, 1500)];
     return !!(t && t > Date.now());
   }
+  // V14.90 — QUÊTES : toute la progression. Une cible de quête n'est plus mise de côté « trop loin » : même île → j'y vais (à pied ou en course auto,
+  // jusqu'à 60 000 px), sinon le sceau découvert le plus proche de la cible (jusqu'à 25 000 px d'elle), sinon j'y vais quand même à pied.
+  function atteignableQuete(p, zone) {
+    if (atteignable(p, zone)) return true;
+    if (!p || !S.pos) return true;
+    if ((!p.w || p.w === S.mapId) && dist(p, S.pos) <= 60000 && !bloqueAppris(p) && !zoneTropHaute(p)) return true;
+    return !!sceauPourDrarito(p, 25000);
+  }
   function atteignable(p, zone) {
     if (!p) return true;
     if (!enMonde() || p.porte || (p.carte && !/^world-/.test(String(p.carte)))) return true; // V14.64 — dans un bâtiment (coordonnées d'intérieur) ou porte d'un bâtiment : toujours atteignable (sinon il entrait et ressortait en boucle)
@@ -6638,14 +6661,14 @@
     if (navigue(but)) { statut('Tournée des sceaux → ' + nom + ' · ' + Math.round(dist(but, S.pos)) + ' px', true); return true; }
     return echoue('inaccessible (chemin bloqué)');
   }
-  function sceauPourDrarito(p) {
+  function sceauPourDrarito(p, rayon) {
     if (!Number(CFG.sceaux)) return null; // V14.66 — tout à pied
     if (!p || typeof p.x !== 'number') return null;
     let best = null;
     (S.sceaux || []).forEach((x) => {
       if (!x.discovered || x.cost == null || (S.ryo != null && x.cost > S.ryo) || ((B.tpKO || {})[x.id] > Date.now())) return;
       const l = lieuSceau(x); if (!l || typeof l.x !== 'number') return;
-      const d = dist(l, p); if (d > 8000 || bloqueDepuis(l, p)) return;
+      const d = dist(l, p); if (d > (rayon || 8000) || bloqueDepuis(l, p)) return;
       if (!best || d < best.d) best = { s: x, l, d };
     });
     return best;
@@ -7949,9 +7972,12 @@
     if (S.gpsEchecs.length >= 2) { S.gpsHS = now + 3600000; S.gpsEchecs = []; note('GPS du jeu : deux échecs en 30 min — je ne l’utilise plus pendant 1 h, je prends mes propres chemins'); }
     return false;
   }
-  // V14.89 — AFK GROUPE : SUIVRE UN JOUEUR DU GROUPE. Toutes les 5 s je demande au jeu la position des membres (party.locate, comme la carte
-  // du groupe) et je marche vers le joueur choisi (Réglages → Combat → « Joueur à suivre » ; par défaut le chef, ou le seul autre membre).
-  // Je m'arrête à 250 px de lui ; s'il est dans un bâtiment ou une autre carte, je l'attends là où je suis.
+  // V14.90 — AFK GROUPE : JE COLLE AU JOUEUR SUIVI. Sa position exacte vient de la carte du jeu (les joueurs visibles autour de moi) :
+  // je reste à moins de 3 cases de lui. Hors de vue, je demande au jeu où il est (party.locate, toutes les 3 s) : s'il est dans la même
+  // île mais une autre instance, je passe dans son instance ; sur une autre île, je prends le sceau de son île ; sinon je marche vers sa zone.
+  // Ses combats : je les rejoins à l'instant où le jeu me les annonce (combat.join), sans attendre la fenêtre.
+  const ZONES_MONDE = {"world-pluie":["amegakure","plaine-grise","lac-de-la-pluie","tour-du-chef"],"world-marche-de-fer":["pays-du-fer","repaire-d-oto","mont-myoboku"],"world-ile-des-mues":["grottes-de-ryuchi"],"world-terres-de-la-neige":["col-du-pays-de-la-neige","glaciers-eternels","forteresse-de-glace"],"world-iles-du-tourbillon":["rivage-d-uzushio","ruines-du-clan-uzumaki","grand-tourbillon"],"world-ile-de-l-ecaille":["plage-de-l-ile-de-la-tortue","jungle-de-la-tortue","cascade-de-la-verite"],"world-terres-des-pretresses":["sentier-des-pretresses","temples-anciens","sanctuaire-du-demon-endormi"],"world-cavernes-noires":["galeries-de-l-akatsuki","cavernes-scellees","antre-de-la-statue-demoniaque"],"world-dernier-front":["coeur-de-la-grande-guerre","tranchees-de-l-alliance","plaine-des-crateres"],"world-domaine-lunaire":["desert-de-cendres","ocean-de-glace","trone-de-kaguya"]};
+  const mondeDeZone = (z) => { z = String(z || ''); if (/^world-/.test(z)) return z.split(':')[0]; for (const w of Object.keys(ZONES_MONDE)) if (ZONES_MONDE[w].indexOf(z) >= 0) return w; return 'world-continent-v6'; };
   function cibleSuivie() {
     const L = (S.groupeMembres || []).filter((x) => x.id !== (S.self && S.self.id) && x.enLigne);
     if (!L.length) return null;
@@ -7962,16 +7988,40 @@
     if (Number(CFG.suivreGroupe) !== 1 || S.combat || !enMonde() || !S.pos) return false;
     const c = cibleSuivie(); if (!c) { statut('AFK groupe : personne à suivre (aucun autre membre en ligne dans mon groupe)', true); return false; }
     const now = Date.now();
-    if (now - (S.locateT || 0) > 5000) { S.locateT = now; envoie('party.locate', {}); }
+    if (S.joinDirect && now - S.joinDirect.t < 4000) { stop(); return true; } // je viens de demander à rejoindre son combat : je ne bouge pas
+    const suit = (P, txt) => {
+      const d = dist(P, S.pos);
+      if (d < 72) { if (S.marche) stop(); statut('AFK groupe : collé à ' + c.nom + ' · j’attends ses combats', true); return true; }
+      if (S.suiviDit !== c.id) { S.suiviDit = c.id; note('AFK groupe : je suis ' + c.nom + ' sur la carte'); }
+      statut('AFK groupe : je suis ' + c.nom + ' · ' + Math.round(d) + ' px' + (txt || ''), true);
+      if (!navigue({ x: P.x, y: P.y })) stop();
+      return true;
+    };
+    // 1) il est en vue : sa position exacte, rafraîchie plusieurs fois par seconde
+    const V = S.posJ && S.posJ.get(c.id);
+    if (V && now - V.t < 4000) return suit(V);
+    // 2) hors de vue : où est-il ?
+    if (now - (S.locateT || 0) > 3000) { S.locateT = now; envoie('party.locate', {}); }
+    const moi = (S.groupeMembres || []).find((x) => S.self && x.id === S.self.id) || {};
+    const instC = String(c.inst || ''), wC = instC ? mondeDeZone(instC) : null;
+    if (wC && wC === String(S.mapId) && moi.inst && instC !== moi.inst && now - (S.instA || 0) > 30000) { // même île, autre instance : je le rejoins dans la sienne
+      S.instA = now; stop(); note('AFK groupe : ' + c.nom + ' est dans une autre instance (' + instC + ') — je passe dans la sienne'); envoie('instance.switch', { instanceId: instC }); return true;
+    }
+    if (wC && wC !== String(S.mapId) && !/^(donjon|antre)/.test(instC)) { // une autre île : le sceau de son île
+      if (now - (S.tpSuivA || 0) > 60000) {
+        const sc = (S.sceaux || []).find((x) => x.discovered && mondeDeZone(x.mapId) === wC && (S.ryo == null || x.cost == null || x.cost <= S.ryo));
+        if (sc) { S.tpSuivA = now; stop(); note('AFK groupe : ' + c.nom + ' est sur ' + wC.replace(/^world-/, '') + ' — je le rejoins par le ' + (sc.name || sc.id)); S.tpZone = true; try { envoie('teleport.remote', { destinationId: sc.id }); } finally { S.tpZone = false; } return true; }
+        if (!S.tpSuivDit || now - S.tpSuivDit > 300000) { S.tpSuivDit = now; note('AFK groupe : ' + c.nom + ' est sur ' + wC.replace(/^world-/, '') + ' et je n’y ai aucun sceau découvert — je l’attends ici'); }
+      }
+      statut('AFK groupe : ' + c.nom + ' est sur une autre île (' + wC.replace(/^world-/, '') + ')', true); return false;
+    }
     const P = S.posGroupe && now - S.posGroupe.t < 15000 ? S.posGroupe.m.get(c.id) : null;
     if (!P) { statut('AFK groupe : je cherche où est ' + c.nom + '…', true); return false; }
-    if (P.mapId !== S.mapId) { statut('AFK groupe : ' + c.nom + ' est ailleurs (' + P.mapId + ') — je l’attends ici', true); return false; }
-    const d = dist(P, S.pos);
-    if (d < 250) { statut('AFK groupe : à côté de ' + c.nom + ' · j’attends ses combats', true); return false; }
-    if (S.suiviDit !== c.id) { S.suiviDit = c.id; note('AFK groupe : je suis ' + c.nom + ' sur la carte'); }
-    statut('AFK groupe : je suis ' + c.nom + ' · ' + Math.round(d) + ' px', true);
-    if (!navigue({ x: P.x, y: P.y })) { stop(); return false; }
-    return true;
+    if (/^world-/.test(P.mapId)) return suit({ x: P.x * (P.x < 4096 && P.y < 4096 ? 32 : 1) + 16, y: P.y * (P.x < 4096 && P.y < 4096 ? 32 : 1) + 16 });
+    const o = origineZone(P.mapId), Z = ZONES[P.mapId];
+    if (!o) { statut('AFK groupe : ' + c.nom + ' est en ' + (NOMS[P.mapId] || P.mapId) + ' (zone pas encore située)', true); return false; }
+    const dedans = Z && P.x < Z.w && P.y < Z.h, cible = dedans ? { x: o.x + P.x * 32 + 16, y: o.y + P.y * 32 + 16 } : { x: o.x + ((Z && Z.w) || 40) * 16, y: o.y + ((Z && Z.h) || 40) * 16 };
+    return suit(cible, ' · vers ' + (NOMS[P.mapId] || P.mapId));
   }
   function gpsArret() { const N = S.gps; S.gps = null; if (N && N.route && N.route.id) try { envoie('navigation.cancel', { id: N.route.id }); } catch (e) {} }
   function gpsRecu(ev, d) {
