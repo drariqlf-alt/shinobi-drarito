@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.2.0
+// @version     15.3.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.2-Drarito';
+  const VERSION = 'V15.3-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1103,6 +1103,23 @@
     }
     if (!('combat' in m)) v.combat = null;
     S.mobs.set(m.id, v);
+    try { if (typeof v.x === 'number' && enMonde()) vuEspece(v); } catch (e) {}
+  }
+  // V15.3 — OÙ J'AI VU CHAQUE MONSTRE (et chaque boss) : sa vraie position, avec son île, mise à jour à chaque fois que le jeu me l'envoie.
+  // Les quêtes s'en servent avant tout autre renseignement (le plan des zones ne sert plus qu'en tout dernier recours).
+  function vuEspece(v, liste) {
+    const ks = new Set((liste || [chefDe(v)].concat(Array.isArray(v.pack) ? v.pack : [])).filter(Boolean)); if (!ks.size) return;
+    const V = B.vuEsp = B.vuEsp || {}, now = Date.now(), z = String(v.id).split('/')[0];
+    ks.forEach((k) => {
+      const L = V[k] = (V[k] || []).filter((p) => now - p.t < 14 * 86400000);
+      const pr = L.find((p) => p.w === S.mapId && Math.abs(p.x - v.x) < 700 && Math.abs(p.y - v.y) < 700);
+      if (pr) { if (now - pr.t > 60000) { pr.x = Math.round(v.x); pr.y = Math.round(v.y); pr.t = now; } }
+      else { L.push({ x: Math.round(v.x), y: Math.round(v.y), w: S.mapId, z: (ZONES[z] || NOMS[z]) ? z : null, t: now }); if (L.length > 8) L.sort((a, b) => b.t - a.t).length = 8; S.vuSale = true; }
+      if (S.vides && S.vides[k]) S.vides[k] = S.vides[k].filter((p) => dist(p, v) > 800); // vu à cet endroit : il n'est plus « absent »
+      if (S.pnjIgnore && S.pnjIgnore['zone:esp:' + k]) delete S.pnjIgnore['zone:esp:' + k];
+      Object.keys(S.qRaison || {}).forEach((q) => { if (/introuvable/.test(String(S.qRaison[q])) && JSON.stringify((S.q.defs.get(q) || {}).steps || '').indexOf(k) >= 0) { delete S.qPause[q]; delete S.qRaison[q]; } });
+    });
+    if (S.vuSale && now - (S.vuSauveT || 0) > 30000) { S.vuSauveT = now; S.vuSale = false; sauveB(); }
   }
 
   function majPerso(ch) {
@@ -1796,6 +1813,7 @@
     if (m.devine === undefined) {
       const id = String(m.id).split('/').pop();
       m.devine = Object.keys(CAT).filter((k) => id.indexOf(k) >= 0).sort((x, y) => y.length - x.length)[0] || null;
+      if (!m.devine) { const q = String(m.id).split('/'); let r = q.length > 1 && q[1].indexOf(q[0] + '-') === 0 ? q[1].slice(q[0].length + 1) : (q.length > 1 ? q[1] : ''); r = r.replace(/(-c?\d+)+$/, '').replace(/^mob-/, ''); if (r && !/lair$|bijuu/.test(r)) m.devine = r; } // V15.3 — espèce absente du catalogue (nouvelles îles) : lue dans l'identifiant « zone/zone-espece-6-c14 »
     }
     return m.devine;
   }
@@ -2093,7 +2111,13 @@
         });
         if (!S.vus.has('carteCles')) { S.vus.add('carteCles'); retiens('carte : champs', Object.keys(v).join(', ') + ' · décors : ' + [...new Set((v.props || []).map((q) => q && (q.kind || q.type || q.id)))].slice(0, 40).join(', ')); }
       } catch (e) {}
-      if (m && /^world-[a-z0-9-]+@/.test(v.id)) { try { carteIle(v.id); retientPortion(NAV.chunks.get(v.id)); } catch (e) {} } // V14.92 — toutes les îles, chacune dans sa carte
+      if (m && /^world-[a-z0-9-]+@/.test(v.id)) { try { carteIle(v.id); retientPortion(NAV.chunks.get(v.id)); } catch (e) {} }
+      if (m && /^world-[a-z0-9-]+@/.test(v.id) && Array.isArray(v.mobs)) { // V15.3 — points d'apparition des monstres écrits dans la carte : la vraie place de chaque espèce
+        try { const ox = Number(m[1]) * 32, oy = Number(m[2]) * 32, W = (v.width || 61) * 32, H = (v.height || 61) * 32;
+          if (!S.vus.has('mobsCarte')) { S.vus.add('mobsCarte'); retiens('monstres de la carte (exemple)', JSON.stringify(v.mobs.slice(0, 2)).slice(0, 500)); }
+          v.mobs.forEach((mb) => { if (!mb || typeof mb.x !== 'number') return; const local = mb.x < W && mb.y < H, x = local ? ox + mb.x : mb.x, y = local ? oy + mb.y : mb.y, id = String(mb.id || ''), sp = mb.mobId || mb.species || chefDe({ id }); const liste = [sp].concat(Array.isArray(mb.pack) ? mb.pack.map((p) => (typeof p === 'string' ? p : p && (p.mobId || p.id))) : []).filter(Boolean); if (liste.length) vuEspece({ id: id || sp, x, y }, liste); });
+        } catch (e) {}
+      } // V14.92 — toutes les îles, chacune dans sa carte
     });
     if (R.carte) {
       const m = /@(-?\d+),(-?\d+)$/.exec(R.carte.id);
@@ -3177,6 +3201,7 @@
     if (bat && enMonde()) { const pp = (B.portes || {})[bat], bp = batPos(bat); return { x: pp ? pp.x : bp.x, y: pp ? pp.y : bp.y + 32, exact: true, porte: bat }; } // pp : l'endroit d'où vous êtes entré à la main
     if (ici) return null;
     const k = B.pnj[id];
+    if (enMonde() && k && k.exact && k.vu && /^world-/.test(String(k.carte || '')) && String(k.carte).split(':')[0] !== S.mapId) return { x: k.x, y: k.y, exact: true, w: String(k.carte).split(':')[0] }; // V15.3 — PNJ vu sur une autre île : sa vraie place, avec son île (sceau ou bac pour y aller)
     if (enMonde()) {
       if (k && k.carte === S.mapId && k.exact && k.vu) return { x: k.x, y: k.y, exact: true }; // vu de mes yeux (depuis la V10.1) : rien ne vaut ça
       const ko = (B.planKO || {})[id] && Date.now() - B.planKO[id] < 7 * 86400000;
@@ -4045,7 +4070,12 @@
     const vaVers = (k, label, q, sig) => {
       if (q && S.espBloq && S.espBloq[k] > maintenant) { if (!(S.qPause[q] > maintenant)) { S.qPause[q] = S.espBloq[k]; (S.qRaison = S.qRaison || {})[q] = 'cible trop forte pour l’instant'; S.objTenu = null; note('Quête ' + q + ' : bloquée (cible trop forte pour l’instant) — je passe à une autre quête'); } return null; }
       let l = (B.especes[k] || {}).lieu;
-      const vuIci = l && l.w === S.mapId && !(((S.vides || {})[k] || []).some((v) => maintenant - v.t < 2700000 && dist(v, l) < 500)); // V15.0 — un endroit où je l'ai vraiment combattu, sur cette île : il passe avant le plan
+      { // V15.3 — là où je l'ai VU sur cette île (le plus proche, pas déjà visité en vain) passe avant tout
+        const vs = ((B.vuEsp || {})[k] || []).filter((p) => p.w === S.mapId && !(((S.vides || {})[k] || []).some((x) => maintenant - x.t < 2700000 && dist(x, p) < 500))).sort((a, b) => dist(a, S.pos) - dist(b, S.pos));
+        if (vs.length) l = { x: vs[0].x, y: vs[0].y, z: vs[0].z, w: S.mapId, vu: true };
+        else if (!(l && l.w === S.mapId)) { const ail = ((B.vuEsp || {})[k] || []).filter((p) => p.w && p.w !== S.mapId).sort((a, b) => b.t - a.t)[0]; if (ail) l = { x: ail.x, y: ail.y, z: ail.z, w: ail.w, vu: true }; } // vu sur une autre île : j'irai (sceau ou bac)
+      }
+      const vuIci = (l && l.vu) || l && l.w === S.mapId && !(((S.vides || {})[k] || []).some((v) => maintenant - v.t < 2700000 && dist(v, l) < 500)); // V15.0 — un endroit où je l'ai vraiment combattu, sur cette île : il passe avant le plan
       if (enMonde() && !vuIci) { // à défaut seulement : le plan des zones dit où cette espèce apparaît, on prend l'endroit le plus proche
         let mieux = null, nbLieux = 0;
         const cle = (q) => (mondeBut({}, q.z) && mondeBut({}, q.z) !== S.mapId ? 1e7 : 0) + dist(q, S.pos); // V14.94 — un endroit de mon île passe avant ceux des autres îles
