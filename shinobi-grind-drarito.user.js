@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.9.0
+// @version     15.10.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.9-Drarito';
+  const VERSION = 'V15.10-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -3359,9 +3359,9 @@
   }
   async function voyageSceau(but, zoneBut) {
     const maintenant = Date.now();
-    if (!Number(CFG.sceaux) || !enMonde() || S.combat || maintenant < (S.tpA || 0) || !S.sceaux) return false;
+    const ileAutre = estDrarito() && enMonde() && (() => { const w = mondeBut(but, zoneBut); return !!(w && w !== S.mapId); })(); // V14.94
+    if (!Number(CFG.sceaux) || !enMonde() || S.combat || (!ileAutre && maintenant < (S.tpA || 0)) || !S.sceaux) return false; // V15.10 — vers une autre île, la marche jusqu'au passeur n'attend pas le délai entre deux sceaux
     const d = dist(but, S.pos);
-    const ileAutre = estDrarito() && (() => { const w = mondeBut(but, zoneBut); return !!(w && w !== S.mapId); })(); // V14.94
     if (!ileAutre && d < (estDrarito() && (bloqueAppris(but) || zoneInterdite(but)) ? 1800 : 3500)) return false;
     B.tpKO = B.tpKO || {};
     const J = litIndications(), ind = NAV.quete && J.sorties[NAV.quete];
@@ -3370,9 +3370,10 @@
     if (basNivDrarito()) { // Drarito — seulement un sceau qui me dépose à moins de 8 000 px du but, et plus près que là où je suis ; sinon pas de voyage
       const wB = mondeBut(but, zoneBut);
       if (wB && wB !== S.mapId) { // V14.94 — le but est sur une autre île : sceau de cette île, quelle que soit la « distance » (elle ne veut rien dire d'une île à l'autre)
-        const sp = sceauPourDrarito(Object.assign({}, but, { w: wB, z: zoneBut || but.z }));
+        const sp = maintenant < (S.tpA || 0) ? null : sceauPourDrarito(Object.assign({}, but, { w: wB, z: zoneBut || but.z }));
         if (!sp) {
           const pasR = routeIle(wB);
+          if (pasR && pasR.type === 'sceau' && maintenant < (S.tpA || 0)) return false;
           if (pasR && pasR.type === 'sceau') { // V14.96 — un sceau vers une île d'où part un bac pour la bonne île
             stop(); S.tpA = maintenant + 60000; note('Sceau : étape vers ' + wB.replace(/^world-/, '') + ' — ' + (pasR.s.name || pasR.s.id) + ' puis le bac');
             S.tpZone = true; try { envoie('teleport.remote', { destinationId: pasR.s.id }); } finally { S.tpZone = false; }
@@ -7755,6 +7756,7 @@
           return;
         }
         if (o && o.type === 'va' && !o.sceau && await voyageSceau(o, o.zoneId || (/^biju:/.test(String(o.zone)) ? null : null))) return;
+        if (o && o.type === 'va' && estDrarito() && o.w && enMonde() && String(o.w).split(':')[0] !== S.mapId) { stop(); statut('→ ' + o.label + ' : j’attends le prochain sceau ou bac (' + Math.max(0, Math.round(((S.tpA || 0) - Date.now()) / 1000)) + ' s)', true); return; } // V15.10 — but sur une autre île : jamais « arrivé » ici (il répétait 340 fois « Arrivé au cœur de la zone »)
         if (o && o.type === 'va') {
           statut('→ ' + o.label + ' · ' + Math.round(dist(o, S.pos)) + ' px', true);
           if (/^esp:/.test(String(o.zone)) && dist(o, S.pos) < 60) { // arrivé là où vit la cible, et elle n'y est pas
