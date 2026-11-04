@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.8.0
+// @version     15.8.1
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.8-Drarito';
+  const VERSION = 'V15.8.1-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -7016,7 +7016,8 @@
       return true;
     }
     S.brisEchecs = 0; S.nbBris = (S.nbBris || 0) + lot.length; S.nbBrisRun = (S.nbBrisRun || 0) + lot.length;
-    note('🔨 Brisé ' + lot.length + ' pièce(s) : ' + lot.map((x) => x.itemId + ' (' + B.nivObj[x.itemId] + ')').join(', ').slice(0, 300));
+    const nivB = B.nivObj || {}; // Drarito — V15.8.1 : B.nivObj n'existe pas quand le brisage par niveau est coupé (cas de Drarito) ; lire B.nivObj[...] plantait la boucle juste après un brisage réussi
+    note('🔨 Brisé ' + lot.length + ' pièce(s) : ' + lot.map((x) => x.itemId + ' (' + (typeof nivB[x.itemId] === 'number' ? nivB[x.itemId] : (RAR[x.itemId] || {}).r || '?') + ')').join(', ').slice(0, 300));
     return true;
   }
   // V13.2 — brisage direct : le jeu accepte les pièces du sac ET du coffre dans le même message (60 au plus), plus besoin de les sortir.
