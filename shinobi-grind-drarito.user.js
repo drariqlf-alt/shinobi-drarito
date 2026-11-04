@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.4.0
+// @version     15.5.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.4-Drarito';
+  const VERSION = 'V15.5-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -4199,9 +4199,14 @@
         } else if ((o.kind === 'enter' || o.kind === 'reach') && o.mapId) {
           let n = 0, sx = 0, sy = 0; // le cœur de la zone, d'après les ennemis qui y vivent
           S.mobs.forEach((mob) => { if (String(mob.id).indexOf(o.mapId + '/') === 0 && typeof mob.x === 'number') { n++; sx += mob.x; sy += mob.y; } });
-          const oz = origineZone(o.mapId), ZZ = ZONES[o.mapId];
-          if (oz && ZZ) { n = 1; sx = oz.x + ZZ.w * 16; sy = oz.y + ZZ.h * 16; }
-          if (n && !(S.pnjIgnore['zone:' + o.mapId] > maintenant)) { S.qPref = q.questId; return { type: 'va', x: sx / n, y: sy / n, zoneId: o.mapId, zone: o.mapId, label: o.label || def.name, q: q.questId, sig }; }
+          let wZ = S.mapId;
+          if (!n) { // V15.5 — pas d'ennemi de la zone à l'écran : l'endroit le plus proche où j'en ai VU (positions réelles), sur mon île d'abord
+            const pts = []; Object.keys(B.vuEsp || {}).forEach((e) => (B.vuEsp[e] || []).forEach((p) => { if (p.z === o.mapId && p.w) pts.push(p); }));
+            const ici = pts.filter((p) => p.w === S.mapId).sort((a, b) => dist(a, S.pos) - dist(b, S.pos))[0], ail = !ici && pts.sort((a, b) => b.t - a.t)[0];
+            const pt = ici || ail; if (pt) { n = 1; sx = pt.x; sy = pt.y; wZ = pt.w; }
+          }
+          if (!n) { const oz = origineZone(o.mapId), ZZ = ZONES[o.mapId]; if (oz && ZZ) { n = 1; sx = oz.x + ZZ.w * 16; sy = oz.y + ZZ.h * 16; wZ = mondeBut({}, o.mapId) || S.mapId; } } // le plan seulement en dernier recours
+          if (n && !(S.pnjIgnore['zone:' + o.mapId] > maintenant)) { S.qPref = q.questId; return { type: 'va', x: sx / n, y: sy / n, zoneId: o.mapId, w: wZ, zone: o.mapId, label: o.label || def.name, q: q.questId, sig }; }
         } else if (!S.vus.has('obj:' + q.questId + o.kind)) { S.vus.add('obj:' + q.questId + o.kind); note('Objectif « ' + (o.label || o.kind) + ' » (' + o.kind + ') : pas encore pris en charge, à faire à la main'); }
       }
       // Cette quête n'a rien de faisable pour l'instant : on regarde la suivante.
@@ -6754,7 +6759,7 @@
     const best = new Map([[S.mapId, { c: 0, premier: null, pos: S.pos }]]), file = [S.mapId];
     for (let n = 0; file.length && n < 200; n++) {
       file.sort((a, b) => best.get(a).c - best.get(b).c); const ile = file.shift(), cur = best.get(ile);
-      const aretes = L.filter((p) => p.w === ile).map((p) => ({ vers: p.vers, c: 2 + (cur.zone && cur.zone === p.de ? 0.1 : cur.pos ? dist(cur.pos, p) / 15000 : 1), pas: { type: 'bac', p }, pos: null, zone: p.zone })); // la marche jusqu'au passeur compte
+      const aretes = L.filter((p) => p.w === ile && !(cur.pos && !(cur.zone && cur.zone === p.de) && dist(cur.pos, p) > 12000)).map((p) => ({ vers: p.vers, c: 2 + (cur.zone && cur.zone === p.de ? 0.1 : cur.pos ? dist(cur.pos, p) / 15000 : 1), pas: { type: 'bac', p }, pos: null, zone: p.zone })); // V15.5 — jamais un bac qui demande de traverser tout le continent à pied // la marche jusqu'au passeur compte
       sc.forEach((x) => { const v = mondeDeZone(x.mapId); if (v !== ile) aretes.push({ vers: v, c: 1, pas: { type: 'sceau', s: x }, pos: lieuSceau(x), zone: x.mapId }); });
       aretes.forEach((a) => { const c = cur.c + a.c, o = best.get(a.vers); if (!o || c < o.c) { best.set(a.vers, { c, premier: cur.premier || a.pas, pos: a.pos, zone: a.zone }); file.push(a.vers); } });
     }
@@ -6857,6 +6862,7 @@
     if (wP && enMonde() && wP !== S.mapId) { // V14.94 — but sur une autre île : n'importe quel sceau découvert de cette île (les coordonnées d'une île ne se comparent pas à celles d'une autre)
       const L = (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && !((B.tpKO || {})[x.id] > Date.now()) && mondeDeZone(x.mapId) === wP);
       const z = p.z || p.zoneId, sc = (z && L.find((x) => x.mapId === z)) || L[0];
+      if (!sc && !S.vus.has('scManque:' + wP)) { S.vus.add('scManque:' + wP); const tous = (S.sceaux || []).filter((x) => mondeDeZone(x.mapId) === wP); note('Sceaux de ' + wP.replace(/^world-/, '') + ' : ' + (tous.length ? tous.map((x) => (x.name || x.id) + (x.discovered ? '' : ' (pas découvert)') + (x.cost == null ? ' (prix inconnu)' : S.ryo != null && x.cost > S.ryo ? ' (trop cher)' : '') + (((B.tpKO || {})[x.id] > Date.now()) ? ' (refusé récemment)' : '')).join(', ') : 'aucun dans la liste reçue')); }
       return sc ? { s: sc, l: lieuSceau(sc) || p, d: 0, ile: wP } : null;
     }
     let best = null;
