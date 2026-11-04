@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.10.0
+// @version     15.11.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.10-Drarito';
+  const VERSION = 'V15.11-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2356,6 +2356,7 @@
       const now = Date.now();
       if (!S.self || !S.pos || !enMonde() || S.combat) { PAS.tampon = []; PAS.der = null; return; }
       if (S.mapId !== GMONDE) carteIle(S.mapId); // V14.92 — la carte de l'île où je suis
+      try { const zc = JEU.zone; if (zc && (ZONES[zc] || NOMS[zc]) && now - ((S.tpA || 0) - 60000) > 10000 && !(S.rappelA > now)) { const ZV = B.zoneVue = B.zoneVue || {}, L = ZV[zc] = ZV[zc] || []; if (!L.some((p) => p.w === S.mapId && Math.abs(p.x - S.pos.x) < 600 && Math.abs(p.y - S.pos.y) < 600)) { L.push({ x: Math.round(S.pos.x), y: Math.round(S.pos.y), w: S.mapId, t: now }); if (L.length > 60) L.shift(); const ZM = B.zoneMonde = B.zoneMonde || {}; ZM[zc] = S.mapId; S.vuSale = true; } } } catch (e) {} // V15.11 — chaque endroit où le jeu m'affiche le nom de la zone : la zone est là (donnée du jeu)
       { // je me tiens sur cette case : elle est praticable, quoi que dise ma carte (arbres déplacés par les mises à jour du monde)
         const tu = Math.floor(S.pos.x / 32), tv = Math.floor(S.pos.y / 32), iu = tv * GW + tu;
         if (tu > 0 && tv > 0 && tu < GW && tv < GH && GRILLE[iu] === 2) { GRILLE[iu] = 1; const ku = tu + ',' + tv; FIXES.delete(ku); if (B.heurts) delete B.heurts[cleH(ku)]; }
@@ -4102,6 +4103,7 @@
           const zs = Object.keys(ZONES).filter((z) => Object.keys((ZONES[z] || {}).m || {}).some((mk) => mk.slice(z.length + 1).replace(/-\d+$/, '') === k));
           try { const dq = q && S.q.defs.get(q); ((dq && dq.steps) || []).forEach((et) => (et.objectives || []).forEach((o) => { if ((o.kind === 'enter' || o.kind === 'reach') && o.mapId && zs.indexOf(o.mapId) < 0) zs.push(o.mapId); })); } catch (e) {} // la zone que la quête me fait rejoindre
           const pts = []; if (zs.length) Object.keys(B.vuEsp || {}).forEach((e) => (B.vuEsp[e] || []).forEach((p) => { if (p.w === S.mapId && zs.indexOf(p.z) >= 0) pts.push(p); }));
+          zs.forEach((z) => ((B.zoneVue || {})[z] || []).forEach((p) => { if (p.w === S.mapId) pts.push(Object.assign({ z }, p)); })); // V15.11 — et les endroits où le jeu m'a dit « tu es dans cette zone »
           const libres = pts.filter((p) => !(((S.vides || {})[k] || []).some((x) => maintenant - x.t < 2700000 && dist(x, p) < 600))).sort((a, b) => dist(a, S.pos) - dist(b, S.pos));
           if (libres.length) { l = { x: libres[0].x, y: libres[0].y, z: libres[0].z, w: S.mapId, vu: true, explore: true }; if (!S.vus.has('explore:' + k + ':' + libres.length)) { S.vus.add('explore:' + k + ':' + libres.length); note('Quête : ' + ((B.especes[k] || CAT[k] || {}).nom || k) + ' jamais vu ici — j’explore ' + (NOMS[libres[0].z] || libres[0].z) + ' (' + libres.length + ' endroits où j’ai vu des monstres de cette zone)'); } }
         }
@@ -4236,6 +4238,7 @@
           let wZ = S.mapId;
           if (!n) { // V15.5 — pas d'ennemi de la zone à l'écran : l'endroit le plus proche où j'en ai VU (positions réelles), sur mon île d'abord
             const pts = []; Object.keys(B.vuEsp || {}).forEach((e) => (B.vuEsp[e] || []).forEach((p) => { if (p.z === o.mapId && p.w) pts.push(p); }));
+            ((B.zoneVue || {})[o.mapId] || []).forEach((p) => pts.push(p)); // V15.11
             const ici = pts.filter((p) => p.w === S.mapId).sort((a, b) => dist(a, S.pos) - dist(b, S.pos))[0], ail = !ici && pts.sort((a, b) => b.t - a.t)[0];
             const pt = ici || ail; if (pt) { n = 1; sx = pt.x; sy = pt.y; wZ = pt.w; }
           }
