@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.22.0
+// @version     15.23.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.22-Drarito';
+  const VERSION = 'V15.23-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -3840,7 +3840,24 @@
   const nivDonjon = (id) => (B.djNiv || {})[id] || DJ_NIV[id] || 0;
   const MARGE_DJ = 15; // seul, je ne tente que les donjons d'au moins quinze niveaux sous le mien
   // Mode Donjons : l'écart de niveaux se règle (Réglages → Objectif). Ailleurs, quinze niveaux.
-  const djVoulu = () => (CFG.mode === 'donjons' ? String(CFG.djChoisi || '') : '');
+  // V15.23 — DONJONS DEMANDÉS PAR LES QUÊTES : le boss de chaque donjon (données du jeu). Quand une quête demande de vaincre l'un d'eux
+  // (Mōryō…), je fais ce donjon : j'entre si j'ai sa clef, sinon je farme sa clef sur les monstres qui la lâchent, puis j'y vais.
+  const DJ_BOSS = {"taniere-crocs":"loup-alpha","bastion-bandits":"chef-des-bandits","fort-pillards":"seigneur-des-pillards","crypte-brume":"epeiste-de-la-brume","atelier-marionnettes":"sasori","forge-lave":"colosse-de-lave","cloitre-averse":"invocateur-des-six-voies","tour-papier":"bras-droit-du-chef","laboratoire-oto":"gardien-de-pierre","ermitage-crapauds":"crapaud-ermite","pavillon-fer":"general-samourai","antre-blizzard":"mammouth-des-glaces","citadelle-givre":"general-des-glaces","spirale-uzushio":"gardien-des-sceaux-d-uzushio","refuge-verite":"crocodile-colossal","crypte-moryo":"moryo","sanctuaire-nuages":"pain","bastion-reanimes":"kage-reanime","citadelle-guerre":"madara-uchiha","tombeau-primordial":"echo-d-indra"};
+  function djQuete() {
+    if (!estDrarito() || CFG.mode !== 'quetes' || !S.q || !S.q.liste) return '';
+    if (S.djQueteKO && S.djQueteKO.t > Date.now()) return '';
+    for (const q of S.q.liste) {
+      if (q.status !== 'active' || autreClan(q.questId)) continue;
+      const def = S.q.defs.get(q.questId), et = def && def.steps && def.steps[q.stepIndex]; if (!et) continue;
+      for (const o of et.objectives || []) {
+        if (o.kind !== 'kill' || !o.mobId || ((q.counters || {})[o.id] || 0) >= (o.count || 1)) continue;
+        const dj = Object.keys(DJ_BOSS).find((d) => DJ_BOSS[d] === o.mobId);
+        if (dj) { const sg = dj + q.questId + JSON.stringify(q.counters || {}) + q.stepIndex; if (!S.djQueteT || S.djQueteT.sg !== sg) S.djQueteT = { sg, t: Date.now() }; if (Date.now() - S.djQueteT.t > 25 * 60000) { S.djQueteKO = { t: Date.now() + 30 * 60000 }; S.djQueteT = null; note('Donjon ' + dj + ' pour la quête : 25 min sans progrès — je fais les autres quêtes 30 min'); return ''; } if (S.djQueteDit !== dj + q.questId) { S.djQueteDit = dj + q.questId; note('Quête ' + (def.name || q.questId) + ' : ' + ((CAT[o.mobId] || {}).nom || o.mobId) + ' est le boss du donjon ' + (typeof nomDj === 'function' ? nomDj(dj) : dj) + ' — je fais ce donjon (clef en sac, sinon je la farme)'); } return dj; }
+      }
+    }
+    return '';
+  }
+  const djVoulu = () => (CFG.mode === 'donjons' ? String(CFG.djChoisi || '') : djQuete());
   const djEprouve = (id) => { const st = (B.djStats || {})[id], D = ((B.djDefs || {})[id] || []).filter((t) => Date.now() - t < 86400000); return !!(st && st.n >= 5 && (st.xpm || 0) > 0 && D.length === 0); }; /* V14.36 : donjon déjà réussi souvent, sans défaite depuis 24 h */
   const margeDj = (id) => ((id || S.donjonId) && djVoulu() === (id || S.donjonId) ? -100 : (id || S.donjonId) && djEprouve(id || S.donjonId) ? -100 : CFG.mode === 'donjons' && Number(CFG.djMarge) >= 0 && String(CFG.djMarge) !== '' ? Math.min(60, Number(CFG.djMarge)) : MARGE_DJ);
   const djDe = (mapId) => String(mapId || '').replace(/^donjon-/, '').replace(/-\d+$/, '');
@@ -7666,7 +7683,7 @@
         if (fc === true) return;
         if (fc) { m = fc; S.pourQuete = { id: m.id, q: null }; }
       }
-      if (CFG.mode === 'donjons') {
+      if (CFG.mode === 'donjons' || (estDrarito() && CFG.mode === 'quetes' && (djQuete() || /^donjon-/.test(String(S.mapId))))) { // V15.23 — aussi pour un donjon demandé par une quête
         if (/^(donjon|antre)-/.test(String(S.mapId))) { await donjon(); return; }
         if (dedans()) { await sortir(); return; }
         const voulu = djVoulu();
@@ -7703,7 +7720,7 @@
             const fc = await farmCle(voulu);
             if (fc === true) return;
             if (fc) { m = fc; S.pourQuete = { id: m.id, q: null }; }
-            else { stop(); statut('Donjon choisi ' + nom + ' : je ne sais pas encore où tombe sa clef — voir le journal', true); return; }
+            else { if (CFG.mode === 'quetes') { S.djQueteKO = { t: Date.now() + 20 * 60000 }; note('Donjon ' + nom + ' pour la quête : je ne sais pas encore où tombe sa clef — je fais les autres quêtes 20 min'); return; } stop(); statut('Donjon choisi ' + nom + ' : je ne sais pas encore où tombe sa clef — voir le journal', true); return; }
           }
         }
         if (!voulu && enMonde()) {
