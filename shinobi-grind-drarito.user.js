@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.5.0
+// @version     15.6.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.5-Drarito';
+  const VERSION = 'V15.6-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -933,6 +933,7 @@
   function lieuBoss(k) {
     const b = (B.boss || {})[k];
     if (b && b.x != null && (b.w || !enMonde())) return { x: b.x, y: b.y, exact: true, w: b.w }; // V14.98 — position d'île inconnue (ancienne) : je m'en remets au plan des zones
+    if (estDrarito()) return null; // V15.6 — plus jamais l'ancien plan pour un boss
     let mieux = null;
     Object.keys(ZONES).forEach((z) => Object.keys(ZONES[z].m).forEach((mk) => {
       if (mk.indexOf(k) < 0 || bossCle(mk) !== k) return;
@@ -3190,6 +3191,7 @@
     return out;
   }
   function lieuPlan(id) { // position d'un PNJ d'après le plan de sa zone
+    if (estDrarito()) return null; // V15.6 — Drarito : plus jamais l'ancien plan ; un PNJ se trouve là où le jeu me l'a montré
     const z = NPCZ[id], o = z && origineZone(z);
     return o ? { x: o.x + ZONES[z].n[id][0], y: o.y + ZONES[z].n[id][1], exact: !o.approx, proche: !!o.approx, z } : null; // V14.98 — avec sa zone (donc son île)
   }
@@ -4083,22 +4085,12 @@
         if (!l || !l.vu) if (!(l && l.w === S.mapId)) { const ail = ((B.vuEsp || {})[k] || []).filter((p) => p.w && p.w !== S.mapId).sort((a, b) => b.t - a.t)[0]; if (ail) l = { x: ail.x, y: ail.y, z: ail.z, w: ail.w, vu: true }; } // vu sur une autre île : j'irai (sceau ou bac)
       }
       const vuIci = (l && l.vu) || l && l.w === S.mapId && !(((S.vides || {})[k] || []).some((v) => maintenant - v.t < 2700000 && dist(v, l) < 500)); // V15.0 — un endroit où je l'ai vraiment combattu, sur cette île : il passe avant le plan
-      if (enMonde() && !vuIci) { // à défaut seulement : le plan des zones dit où cette espèce apparaît, on prend l'endroit le plus proche
-        let mieux = null, nbLieux = 0;
-        const cle = (q) => (mondeBut({}, q.z) && mondeBut({}, q.z) !== S.mapId ? 1e7 : 0) + dist(q, S.pos); // V14.94 — un endroit de mon île passe avant ceux des autres îles
-        Object.keys(ZONES).forEach((z) => {
-          const o = origineZone(z);
-          if (!o) return;
-          Object.keys(ZONES[z].m).forEach((mk) => {
-            if (mk.slice(z.length + 1).replace(/-\d+$/, '') !== k) return;
-            const q = { x: o.x + ZONES[z].m[mk][0], y: o.y + ZONES[z].m[mk][1], z };
-            nbLieux++;
-            if (((S.vides || {})[k] || []).some((v) => maintenant - v.t < 2700000 && dist(v, q) < 500)) return; // déjà allé voir : personne
-            if (!mieux || cle(q) < cle(mieux)) mieux = q;
-          });
-        });
-        if (mieux) l = mieux;
-        else if (nbLieux) { if (!(S.pnjIgnore['zone:esp:' + k] > maintenant)) { S.pnjIgnore['zone:esp:' + k] = maintenant + 1800000; note('Quête : ' + ((B.especes[k] || CAT[k] || {}).nom || k) + ' introuvable aux ' + nbLieux + ' emplacements connus — je réessaierai dans 30 min'); } if (q && !(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 1800000; (S.qRaison = S.qRaison || {})[q] = 'cible introuvable'; S.objTenu = null; note('Quête ' + q + ' : bloquée (cible introuvable) — je passe à une autre quête'); } return null; }
+      if (enMonde() && !vuIci) { // V15.6 — jamais vu : plus d'ancien plan. J'y vais par le sceau de sa zone, sinon je la mets de côté jusqu'à ce que le jeu me la montre
+        l = null;
+        const zs = Object.keys(ZONES).filter((z) => Object.keys((ZONES[z] || {}).m || {}).some((mk) => mk.slice(z.length + 1).replace(/-\d+$/, '') === k));
+        try { const dq = q && S.q.defs.get(q); ((dq && dq.steps) || []).forEach((et) => (et.objectives || []).forEach((o) => { if ((o.kind === 'enter' || o.kind === 'reach') && o.mapId && zs.indexOf(o.mapId) < 0) zs.push(o.mapId); })); } catch (e) {}
+        if (versZone(zs, 'trouver ' + ((B.especes[k] || CAT[k] || {}).nom || k))) return { type: 'attente', label: 'voyage vers la zone de ' + ((B.especes[k] || CAT[k] || {}).nom || k), surPlace: true };
+        if (zs.indexOf(JEU.zone) < 0 && !(S.pnjIgnore['zone:esp:' + k] > maintenant)) { S.pnjIgnore['zone:esp:' + k] = maintenant + 600000; note('Quête : ' + ((B.especes[k] || CAT[k] || {}).nom || k) + ' jamais vu et pas de sceau découvert dans sa zone (' + zs.map((z) => NOMS[z] || z).join(', ') + ') — mis de côté jusqu’à ce que le jeu me le montre'); if (q && !(S.qPause[q] > maintenant)) { S.qPause[q] = maintenant + 600000; (S.qRaison = S.qRaison || {})[q] = 'cible introuvable'; S.objTenu = null; } }
       }
       const estBoss = enMonde() && ((CAT[k] || {}).rang === 'boss' || !!bossCle(k));
       if (estBoss) { // V14.99 — BOSS : je me fie à ce que je vois, pas au vieux plan des zones (il attendait à un endroit où le boss n'était pas)
@@ -4150,6 +4142,7 @@
         if (o.kind === 'talk') {
           const npc = S.q.cibles[q.questId + ':' + o.id] || (o.npcByVillage && o.npcByVillage[S.village]) || o.npcId;
           if (npc && ok(npc) && lieuPNJ(npc)) { S.qPref = q.questId; return { type: 'talk', npc, label: String(o.label || def.name).replace('{npc}', (B.pnj[npc] || {}).nom || 'ton contact'), q: q.questId, sig }; }
+          else if (npc && ok(npc) && estDrarito() && NPCZ[npc] && versZone([NPCZ[npc]], 'parler à ' + ((B.pnj[npc] || {}).nom || npc))) { S.qPref = q.questId; return { type: 'attente', label: 'voyage vers ' + (NOMS[NPCZ[npc]] || NPCZ[npc]), surPlace: true }; } // V15.6 — PNJ jamais vu : sceau de sa zone, puis la carte du jeu le montre
         } else if (o.kind === 'kill') {
           const m = choisis(o.mobId);
           if (m) { S.qPref = q.questId; return { type: 'kill', m, label: o.label || def.name, q: q.questId, sig }; }
@@ -4205,7 +4198,7 @@
             const ici = pts.filter((p) => p.w === S.mapId).sort((a, b) => dist(a, S.pos) - dist(b, S.pos))[0], ail = !ici && pts.sort((a, b) => b.t - a.t)[0];
             const pt = ici || ail; if (pt) { n = 1; sx = pt.x; sy = pt.y; wZ = pt.w; }
           }
-          if (!n) { const oz = origineZone(o.mapId), ZZ = ZONES[o.mapId]; if (oz && ZZ) { n = 1; sx = oz.x + ZZ.w * 16; sy = oz.y + ZZ.h * 16; wZ = mondeBut({}, o.mapId) || S.mapId; } } // le plan seulement en dernier recours
+          if (!n && versZone([o.mapId], o.label || def.name)) { S.qPref = q.questId; return { type: 'attente', label: 'voyage vers ' + (NOMS[o.mapId] || o.mapId), surPlace: true }; } // V15.6 — plus d'ancien plan : le sceau de la zone
           if (n && !(S.pnjIgnore['zone:' + o.mapId] > maintenant)) { S.qPref = q.questId; return { type: 'va', x: sx / n, y: sy / n, zoneId: o.mapId, w: wZ, zone: o.mapId, label: o.label || def.name, q: q.questId, sig }; }
         } else if (!S.vus.has('obj:' + q.questId + o.kind)) { S.vus.add('obj:' + q.questId + o.kind); note('Objectif « ' + (o.label || o.kind) + ' » (' + o.kind + ') : pas encore pris en charge, à faire à la main'); }
       }
@@ -6849,6 +6842,17 @@
     if (gpsVers(exact ? { mapId: S.mapId, x: Math.round(exact.x), y: Math.round(exact.y) } : { zoneId: x.mapId }, 'tourz:' + x.id)) { statut('Tournée des sceaux → ' + nom + ' · ' + Math.round(dist(but, S.pos)) + ' px', true); return true; }
     if (navigue(but)) { statut('Tournée des sceaux → ' + nom + ' · ' + Math.round(dist(but, S.pos)) + ' px', true); return true; }
     return echoue('inaccessible (chemin bloqué)');
+  }
+  // V15.6 — PLUS AUCUN ANCIEN PLAN POUR SE DÉPLACER : quand je n'ai jamais vu une cible, je vais dans sa zone par le sceau de cette zone
+  // (la liste des sceaux vient du jeu : teleport.network), puis la carte que le jeu m'envoie sur place me donne les vraies positions.
+  function sceauDeZone(zs) { const L = (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && !((B.tpKO || {})[x.id] > Date.now()) && zs.indexOf(x.mapId) >= 0); return L[0] || null; }
+  function versZone(zs, pourquoi) { // vrai si je pars (sceau) ; jamais deux fois en 60 s
+    zs = (zs || []).filter(Boolean); if (!zs.length || !Number(CFG.sceaux) || !enMonde() || S.combat || Date.now() < (S.tpA || 0)) return false;
+    if (zs.indexOf(JEU.zone) >= 0) return false; // j'y suis déjà : c'est à la carte du jeu de me montrer la cible
+    const sc = sceauDeZone(zs); if (!sc) return false;
+    stop(); S.tpA = Date.now() + 60000; note('Je vais à ' + (NOMS[sc.mapId] || sc.mapId) + ' par le ' + (sc.name || sc.id) + ' pour ' + pourquoi + ' (jamais vu jusqu’ici : je regarde sur place)');
+    S.tpZone = true; try { envoie('teleport.remote', { destinationId: sc.id }); } finally { S.tpZone = false; } NAV.route = []; NAV.but = null; NAV.prog = null;
+    return true;
   }
   function mondeBut(p, zone) { // V14.94 — sur quelle île se trouve un but (d'après sa zone), ou null si on ne sait pas
     if (!p) return null; if (p.w && /^world-/.test(p.w)) return String(p.w).split(':')[0];
