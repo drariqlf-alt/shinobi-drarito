@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.19.0
+// @version     15.20.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.19-Drarito';
+  const VERSION = 'V15.20-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -3385,7 +3385,8 @@
           if (pasR && pasR.type === 'sceau') { // V14.96 — un sceau vers une île d'où part un bac pour la bonne île
             stop(); S.tpA = maintenant + 60000; note('Sceau : étape vers ' + wB.replace(/^world-/, '') + ' — ' + (pasR.s.name || pasR.s.id) + ' puis le bac');
             S.tpZone = true; try { envoie('teleport.remote', { destinationId: pasR.s.id }); } finally { S.tpZone = false; }
-            await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500); await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
+            const rE = await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500); await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
+            if (rE && rE.ev === 'world.joined') S.tpA = Date.now() + 5000; // V15.20
             return true;
           }
           const bac = pasR && pasR.type === 'bac' ? pasR.p : null;
@@ -3419,6 +3420,7 @@
         const r1 = await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500);
         await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
         if (!r1 || r1.ev === 'server.error') { B.tpKO[sp.s.id] = maintenant + 1800000; note('Sceau : voyage vers ' + (sp.s.name || sp.s.id) + ' refusé (' + (r1 ? r1.d.code : 'pas de réponse') + ')'); return false; }
+        S.tpA = Date.now() + 5000; // V15.20 — arrivé : l'étape suivante (autre sceau, bac) peut suivre presque tout de suite (il restait immobile 60 s)
         return true;
       }
       const sp = sceauPourDrarito(but);
@@ -6607,7 +6609,7 @@
     if ((seuil < 0 && Number(CFG.venteInutile) !== 1) || S.combat || !enMonde() || (now < (S.vcA || 0) && sig === S.vcSig) || !S.equip) return false;
     S.vcSig = sig; // le coffre, le sac ou les couleurs connues ont changé : je regarde tout de suite
     if (seuil >= 0 && !Object.keys(RAR).length && Number(CFG.venteInutile) !== 1) { S.vcA = now + 20000; return false; }
-    if (estDrarito() && zoneFarm()) return false; // V14.78 — farm fixé : jamais de tournée de vente hors de la zone (rien n'est vendable de toute façon tant que les couleurs sont inconnues)
+    if (estDrarito() && (zoneFarm() || CFG.mode === 'quetes')) return false; // V15.20 — rush quêtes : pas de tournée de vente (elle l'enfermait dans Ichiraku et bloquait la quête en cours) · V14.78 — farm fixé : jamais de tournée de vente hors de la zone (rien n'est vendable de toute façon tant que les couleurs sont inconnues)
     if (estDrarito()) { // Drarito — tournée de vente dès que le sac est presque plein, et je vends tout ce qui peut l'être avant de reprendre
       const libre0 = (S.invCap || 60) - S.inv.filter((x) => x && x.itemId).length;
       if (!S.drVente && libre0 > 15) return false;
