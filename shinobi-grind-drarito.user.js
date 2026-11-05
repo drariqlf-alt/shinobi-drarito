@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.28.0
+// @version     15.29.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.28-Drarito';
+  const VERSION = 'V15.29-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2601,18 +2601,19 @@
   // la vraie distance à pied de chaque case jusqu'au but (algorithme de Dial, coûts entiers : chemin déjà parcouru < terrain connu < inconnu,
   // cases collées à un mur plus chères), puis je descends la pente depuis ma case : on ne peut plus finir coincé dans un cul-de-sac.
   const CH = { cle: '', t: 0, d: null, x0: 0, y0: 0, bw: 0, bh: 0, ver: '' };
-  function champ(dep, arr) {
+  function champ(dep, arr, ouvre) {
     const vol = Math.max(Math.abs(dep.x - arr.x), Math.abs(dep.y - arr.y)), M = vol > 1400 ? 100 : vol > 1000 ? 160 : 250, x0 = Math.max(1, Math.min(dep.x, arr.x) - M), y0 = Math.max(1, Math.min(dep.y, arr.y) - M), x1 = Math.min(GW - 2, Math.max(dep.x, arr.x) + M), y1 = Math.min(GH - 2, Math.max(dep.y, arr.y) + M);
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1, n = bw * bh, now = Date.now();
     if (n > 4500000) return null; // traversée géante : je garde l'ancien calcul (anti-lag)
     const tmp = new Set(); NAV.murs.forEach((t, k) => { if (t > now) { const q = k.split(','); tmp.add(Number(q[1]) * GW + Number(q[0])); } }); FIXES.forEach((k) => { const q = k.split(','); tmp.add(Number(q[1]) * GW + Number(q[0])); });
-    const ver = GMONDE + '|' + tmp.size + '|' + (carteSale ? 1 : 0), cle = arr.x + ',' + arr.y;
+    const ver = GMONDE + '|' + tmp.size + '|' + (carteSale ? 1 : 0) + (ouvre ? '|o' : ''), cle = arr.x + ',' + arr.y;
     if (CH.d && CH.cle === cle && CH.ver === ver && now - CH.t < 30000 && dep.x >= CH.x0 && dep.y >= CH.y0 && dep.x < CH.x0 + CH.bw && dep.y < CH.y0 + CH.bh) return CH;
     // coûts pré-calculés sur le rectangle (rapide) : 0 = infranchissable
     const bl = new Uint8Array(n);
     for (let y = 0; y < bh; y++) { const gy = (y + y0) * GW + x0, ly = y * bw; for (let x = 0; x < bw; x++) { const gi = gy + x; if (GRILLE[gi] === 2 && !PASSE[gi]) bl[ly + x] = 1; } }
     tmp.forEach((gi) => { const x = (gi % GW) - x0, y = ((gi / GW) | 0) - y0; if (x >= 0 && y >= 0 && x < bw && y < bh) bl[y * bw + x] = 1; });
     try { Object.keys(B.portes || {}).forEach((k) => { const q = B.portes[k]; if (!q || typeof q.x !== 'number' || (q.w ? q.w !== GMONDE : GMONDE !== CONTINENT)) return; const tx = Math.floor(q.x / 32), ty = Math.floor(q.y / 32); if (Math.abs(tx - arr.x) <= 2 && Math.abs(ty - arr.y) <= 2) return; for (let yy = ty - 1; yy <= ty; yy++) for (let xx = tx - 1; xx <= tx + 1; xx++) { const x = xx - x0, y = yy - y0; if (x >= 0 && y >= 0 && x < bw && y < bh) bl[y * bw + x] = 1; } }); } catch (e) {} // V15.26 — portes des bâtiments : jamais sur ma route (marcher dessus me faisait entrer, et je sortais/rentrais en boucle)
+    if (ouvre) for (let yy = dep.y - 2; yy <= dep.y + 2; yy++) for (let xx = dep.x - 2; xx <= dep.x + 2; xx++) { const gi = yy * GW + xx, x = xx - x0, y = yy - y0; if (x >= 0 && y >= 0 && x < bw && y < bh && !tmp.has(gi)) bl[y * bw + x] = 0; } // V15.29 — enfermé d'après la carte : les murs de la carte autour de moi peuvent être faux, mais jamais ceux que j'ai heurtés
     bl[(dep.y - y0) * bw + (dep.x - x0)] = 0; // V15.26 — seulement MA case (j'y suis) : les arbres et obstacles heurtés autour de moi restent des murs (il retapait le même arbre)
     const cout = new Uint8Array(n);
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
@@ -2645,7 +2646,9 @@
   }
   function routeChamp(dep, arr) {
     try {
-      const t0 = performance.now(), C = champ(dep, arr), bw = C.bw, bh = C.bh, D = C.d;
+      const t0 = performance.now(); let C = champ(dep, arr); if (!C) return null;
+      if (C.d[(dep.y - C.y0) * C.bw + (dep.x - C.x0)] === 0xffffffff) { C = champ(dep, arr, true); if (!C) return null; } // V15.29 — « route 0 case » : il fonçait droit dans le mur
+      const bw = C.bw, bh = C.bh, D = C.d;
       let lx = dep.x - C.x0, ly = dep.y - C.y0; if (lx < 0 || ly < 0 || lx >= bw || ly >= bh) return null;
       if (D[ly * bw + lx] === 0xffffffff) return null; // aucun chemin connu dans ce rectangle
       const route = [], mrG = (x, y) => GRILLE[y * GW + x] === 2 && !PASSE[y * GW + x];
@@ -3763,6 +3766,7 @@
       const d = S.q.defs.get(id) || {};
       if (/^(examen|grade|promotion)-/.test(id) || d.grade) return true;
       if (/^heritage-/.test(id) || d.heritage || d.clan) return !autreClan(id);
+      if (S.deblocage) return true; // V15.29 — plus rien de gros à faire : toutes les quêtes disponibles comptent (elles débloquent les suites)
       return nivQuete(id) >= (CFG.queteNivMin == null || CFG.queteNivMin === '' ? 100 : Number(CFG.queteNivMin) || 0) || (xpQuete(id) || 0) >= (CFG.queteXpMin == null || CFG.queteXpMin === '' ? 200000 : Number(CFG.queteXpMin) || 0); // V15.13 — ou qui rapporte au moins 200 000 XP, quel que soit son niveau
     }
     if (rang(id) <= 1 || deMonVillage(id) || villagePrio(id) || quotidienne(id)) return true;
@@ -4250,7 +4254,21 @@
     if (attente > 70000 && S.djEtape === 3) { S.djEtape = 4; note('Donjon : je ne trouve pas la suite dans ' + S.mapId + '. Sortez à la main et envoyez-moi le journal (bloc DÉCOUVERTES).'); const id = String(S.mapId).replace(/^donjon-/, '').replace(/-\d+$/, ''); B.djKO = B.djKO || {}; B.djKO[id] = Date.now() + 6 * 3600000; sauveB(); }
     statut('Donjon : salle vidée, je cherche la suite', true);
   }
+  // V15.29 — DÉBLOCAGE : quand aucune quête rentable n'est faisable, je prends et je fais aussi les petites quêtes disponibles sur la carte
+  // (elles ouvrent souvent des suites bien plus grosses — ex. « papier-01 » → « papier-06 »), au lieu de seulement chasser. Dès qu'une quête
+  // rentable redevient faisable, elle repasse devant.
   function objectif() {
+    if (!estDrarito() || CFG.mode !== 'quetes' || Number(CFG.deblocage) === 0) { S.deblocage = false; return objectif0(); }
+    S.deblocage = false;
+    const o = objectif0();
+    if (o && !(o.type === 'attente' && !o.surPlace)) { if (S.deblocDit) { S.deblocDit = ''; } return o; }
+    S.deblocage = true;
+    const o2 = objectif0();
+    if (o2 && !(o2.type === 'attente' && !o2.surPlace)) { const sig = String(o2.q || o2.npc || o2.label || ''); if (S.deblocDit !== sig) { S.deblocDit = sig; note('Plus de grosse quête faisable : je fais les petites quêtes disponibles (elles débloquent les suites) — ' + (o2.label || '') + (o2.q ? ' · ' + o2.q : '')); } return o2; }
+    S.deblocage = false;
+    return o || o2;
+  }
+  function objectif0() {
     const maintenant = Date.now();
     const ok = (id) => !(S.pnjIgnore[id] > maintenant);
     const actives = S.q.liste.filter((q) => q.status === 'active' && !(S.qPause[q.questId] > maintenant) && !autreClan(q.questId) && queteRentable(q.questId) && (!aokiriOn() || queteDansAokiri(q.questId)))
