@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.25.1
+// @version     15.26.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.25.1-Drarito';
+  const VERSION = 'V15.26-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -2598,7 +2598,8 @@
     const bl = new Uint8Array(n);
     for (let y = 0; y < bh; y++) { const gy = (y + y0) * GW + x0, ly = y * bw; for (let x = 0; x < bw; x++) { const gi = gy + x; if (GRILLE[gi] === 2 && !PASSE[gi]) bl[ly + x] = 1; } }
     tmp.forEach((gi) => { const x = (gi % GW) - x0, y = ((gi / GW) | 0) - y0; if (x >= 0 && y >= 0 && x < bw && y < bh) bl[y * bw + x] = 1; });
-    for (let y = Math.max(0, dep.y - y0 - 2); y <= Math.min(bh - 1, dep.y - y0 + 2); y++) for (let x = Math.max(0, dep.x - x0 - 2); x <= Math.min(bw - 1, dep.x - x0 + 2); x++) bl[y * bw + x] = 0; // autour de moi : j'y suis, donc praticable
+    try { Object.keys(B.portes || {}).forEach((k) => { const q = B.portes[k]; if (!q || typeof q.x !== 'number' || (q.w ? q.w !== GMONDE : GMONDE !== CONTINENT)) return; const tx = Math.floor(q.x / 32), ty = Math.floor(q.y / 32); if (Math.abs(tx - arr.x) <= 2 && Math.abs(ty - arr.y) <= 2) return; for (let yy = ty - 1; yy <= ty; yy++) for (let xx = tx - 1; xx <= tx + 1; xx++) { const x = xx - x0, y = yy - y0; if (x >= 0 && y >= 0 && x < bw && y < bh) bl[y * bw + x] = 1; } }); } catch (e) {} // V15.26 — portes des bâtiments : jamais sur ma route (marcher dessus me faisait entrer, et je sortais/rentrais en boucle)
+    bl[(dep.y - y0) * bw + (dep.x - x0)] = 0; // V15.26 — seulement MA case (j'y suis) : les arbres et obstacles heurtés autour de moi restent des murs (il retapait le même arbre)
     const cout = new Uint8Array(n);
     for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
       const li = y * bw + x; if (bl[li]) continue; const gi = (y + y0) * GW + x + x0;
@@ -3124,7 +3125,13 @@
     stop();
     await dort(400);
     if (S.mapId !== avant) {
-      if (bat) { B.portes = B.portes || {}; B.portes[bat] = dernier; sauveB(); note(quoi + ' : fait depuis ' + dernier.x + ',' + dernier.y + ' (retenu)'); } else note(quoi + ' : fait');
+      if (bat && S.mapId.indexOf(PREFIXE) === 0 && S.mapId !== PREFIXE + bat) { // V15.26 — le jeu m'a fait entrer dans un AUTRE bâtiment (porte voisine) : je retiens la vraie porte de celui-ci, pas celle de « bat »
+        const reel = S.mapId.slice(PREFIXE.length); B.portes = B.portes || {}; B.portes[reel] = dernier;
+        if (B.portes[bat] && dist(B.portes[bat], dernier) < 120) delete B.portes[bat];
+        S.porteKO = S.porteKO || {}; (S.porteKO[bat] = S.porteKO[bat] || []).push({ x: dernier.x, y: dernier.y - 36 }); sauveB();
+        note(quoi + ' : mauvaise porte — je suis entré dans « ' + reel + ' » (porte retenue pour lui en ' + dernier.x + ',' + dernier.y + ')');
+      } else if (bat) { B.portes = B.portes || {}; B.portes[bat] = dernier; sauveB(); note(quoi + ' : fait depuis ' + dernier.x + ',' + dernier.y + ' (retenu)'); } else note(quoi + ' : fait');
+      S.dernierFranchi = { x: dernier.x, y: dernier.y, map: avant };
       return true;
     }
     note(quoi + ' : refusé' + (r && r.d && r.d.code ? ' (' + r.d.code + ')' : ' (pas de réponse)'));
@@ -3132,7 +3139,7 @@
   }
   async function sortir() {
     const b = dedans();
-    const but = { x: 320, y: 470 };
+    const but = ((B.sortiePos || {})[S.mapId]) || { x: 320, y: 470 }; // V15.26 — l'endroit d'où la sortie a marché la dernière fois dans CE bâtiment
     if (dist(but, S.pos) > 44 && !(S.sortieA && Date.now() - S.sortieA > 9000)) {
       if (!S.sortieA) S.sortieA = Date.now();
       statut('→ sortie du bâtiment', true);
@@ -3145,6 +3152,18 @@
       if (S.sortieEchecs >= 5) { S.on = false; memoriseOn(); note('Je n’arrive pas à sortir du bâtiment : sortez à la main puis relancez le bot.'); }
     } else {
       S.sortieEchecs = 0;
+      try { const sf = S.dernierFranchi; if (sf && sf.map && sf.map.indexOf(PREFIXE) === 0) { B.sortiePos = B.sortiePos || {}; B.sortiePos[sf.map] = { x: Math.round(sf.x), y: Math.round(sf.y) }; sauveB(); } } catch (e) {}
+      try { // V15.26 — garde-fou : sortir 3 fois du même bâtiment en 3 min = je rentre dedans malgré moi (porte sous mes pieds) : je bloque toute la porte 5 min et je laisse ce but 20 min
+        const now = Date.now(), SO = S.sortiesB = S.sortiesB || {}, k = String((S.dernierFranchi || {}).map || b); SO[k] = (SO[k] || []).filter((t) => now - t < 180000); SO[k].push(now);
+        if (SO[k].length >= 3 && enMonde() && S.pos) {
+          SO[k] = []; const t = { x: Math.floor(S.pos.x / 32), y: Math.floor(S.pos.y / 32) }, fin = now + 300000;
+          for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if ((dx || dy) && (Math.abs(dx) > 1 || dy < 0)) NAV.murs.set((t.x + dx) + ',' + (t.y + dy), fin);
+          if (S.objQ) { S.qPause[S.objQ] = now + 1200000; (S.qRaison = S.qRaison || {})[S.objQ] = 'boucle entrée/sortie'; }
+          if (S.pnjVise) S.pnjIgnore[S.pnjVise] = now + 1200000;
+          S.objTenu = null; S.qEng = null; S.recul = { x: 0, y: 1, fin: now + 1500 };
+          note('Bâtiment ' + k.replace(PREFIXE, '') + ' : je ressors pour la 3e fois en 3 min — porte bloquée 5 min, je passe à un autre objectif');
+        }
+      } catch (e) {}
       try { if (enMonde() && S.pos) { // V14.98 — à peine sorti, la route repassait par la porte et me faisait rentrer : la porte est fermée pour moi 45 s, et je fais un pas pour m'en écarter
         const t = { x: Math.floor(S.pos.x / 32), y: Math.floor(S.pos.y / 32) }, fin = Date.now() + 45000;
         for (let dy = -3; dy <= -1; dy++) for (let dx = -1; dx <= 1; dx++) NAV.murs.set((t.x + dx) + ',' + (t.y + dy), fin);
@@ -3585,7 +3604,7 @@
     return true;
   }
   async function parle(npcId, pourquoi) {
-    rafraichit();
+    rafraichit(); S.pnjVise = npcId;
     const p = lieuPNJ(npcId);
     const nom = (B.pnj[npcId] || {}).nom || npcId;
     if (!p) { S.pnjIgnore[npcId] = Date.now() + 300000; note('PNJ introuvable : ' + nom + '. Passez près de lui une fois à la main, le bot retiendra sa position.'); return; }
