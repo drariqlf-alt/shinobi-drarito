@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.27.0
+// @version     15.28.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.27-Drarito';
+  const VERSION = 'V15.28-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1225,6 +1225,20 @@
     if (id) { const k = NIV_CLES.find((c) => typeof v[c] === 'number' && v[c] > 0 && v[c] < 400); if (k && !(B.objets[id] && B.objets[id].non === 'not_equippable')) { B.nivObj = B.nivObj || {}; if (B.nivObj[id] !== v[k]) { B.nivObj[id] = v[k]; S.nivSales = true; } } }
     for (const c in v) { const x = v[c]; if (x && typeof x === 'object') apprendNiveaux(x, prof + 1); }
   }
+  // V15.28 — la liste des sceaux envoyée par le jeu ne contient que ceux de l'île où je suis (depuis le continent : pas le Sceau des cavernes scellées,
+  // alors que le voyage à distance y marche — vous l'avez découvert). Je garde en mémoire chaque sceau déjà vu, et ceux des îles où Drarito est déjà allé.
+  const SCEAUX_ILES = { 'sceau-uzushio': ['Sceau d’Uzushio', 'rivage-d-uzushio'], 'sceau-col-de-la-neige': ['Sceau du col de la Neige', 'col-du-pays-de-la-neige'], 'sceau-pays-des-demons': ['Sceau du Pays des Démons', 'sentier-des-pretresses'], 'sceau-cavernes-scellees': ['Sceau des cavernes scellées', 'cavernes-scellees'], 'sceau-ile-de-la-tortue': ['Sceau de l’Île de la Tortue', 'plage-de-l-ile-de-la-tortue'], 'sceau-alliance': ['Sceau de l’Alliance', 'tranchees-de-l-alliance'], 'sceau-dimension-de-kaguya': ['Sceau de la dimension de Kaguya', 'trone-de-kaguya'] };
+  function completeSceaux(liste) {
+    try {
+      const M = B.sceauxListe = B.sceauxListe || {};
+      liste.forEach((x) => { if (x && x.id && x.mapId) { const o = M[x.id] || {}; M[x.id] = { id: x.id, name: x.name || o.name, mapId: x.mapId, discovered: !!(x.discovered || o.discovered), cost: x.cost != null ? x.cost : o.cost }; } });
+      if (!estDrarito()) return liste;
+      const ids = new Set(liste.map((x) => x && x.id)), plus = [];
+      Object.keys(M).forEach((id) => { if (!ids.has(id) && M[id].discovered) { ids.add(id); plus.push(Object.assign({}, M[id], { cost: M[id].cost != null ? M[id].cost : 300, memoire: 1 })); } });
+      Object.keys(SCEAUX_ILES).forEach((id) => { if (!ids.has(id)) plus.push({ id, name: SCEAUX_ILES[id][0], mapId: SCEAUX_ILES[id][1], discovered: true, cost: 300, memoire: 1 }); });
+      return liste.concat(plus);
+    } catch (e) { return liste; }
+  }
   function traite(ev, d) {
     if (d && typeof d === 'object' && /inventory|item|forge|craft|equip|gear|rune|panopl|set\.|vault|stuff/i.test(ev)) { try { S.brutEq = S.brutEq || {}; const j = JSON.stringify(d); if (j.length < 600000) S.brutEq[ev] = j; } catch (e) {} }
     if (d && typeof d === 'object' && /inventory|item|forge|craft|market|shop|vault|bank|coffre|chest|equip|gear|loot|reward/i.test(ev)) { try { apprendNiveaux(d, 0); } catch (e) {} }
@@ -1322,7 +1336,7 @@
     if (/^teleport\./.test(ev) && d && Array.isArray(d.seals) && d.seals.length && d.seals[0] && 'discovered' in d.seals[0]) { // liste des sceaux, quelle que soit la fenêtre qui l'apporte
       const avant = new Set((S.sceaux || []).filter((x) => x.discovered).map((x) => x.id));
       d.seals.forEach((x) => { if (x.discovered && S.sceaux && !avant.has(x.id)) note('Sceau de téléportation découvert : ' + x.name); });
-      S.sceaux = d.seals; S.sceauxT = Date.now();
+      S.sceaux = completeSceaux(d.seals); S.sceauxT = Date.now();
       if (typeof d.ryo === 'number') { S.ryo = d.ryo; if (S.ryoDebut == null) S.ryoDebut = d.ryo; }
     }
     if (ev === 'chat.message') relaieTchat(d);
@@ -3933,7 +3947,7 @@
       envoie('teleport.open', { sealId: x.id });
       const r = await attend((ev) => ev === 'teleport.window' || ev === 'server.error', 2500);
       if (r && r.ev === 'teleport.window') {
-        if (r.d && Array.isArray(r.d.seals)) { S.sceaux = r.d.seals; S.sceauxT = Date.now(); }
+        if (r.d && Array.isArray(r.d.seals)) { S.sceaux = completeSceaux(r.d.seals); S.sceauxT = Date.now(); }
         w.ok = 1; B.sceauxPos = B.sceauxPos || {}; B.sceauxPos[x.id] = { x: Math.round(S.pos.x), y: Math.round(S.pos.y), ok: 1 }; sauveB();
         note('Sceau enregistré : ' + x.name);
         const ferme = [...document.querySelectorAll('button')].find((bt) => bt.offsetParent !== null && !bt.closest('#__sg_ui, #__sg_fen') && /^(×|✕|x|fermer)$/i.test(String(bt.textContent || '').trim()));
