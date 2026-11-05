@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.29.0
+// @version     15.30.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.29-Drarito';
+  const VERSION = 'V15.30-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -670,6 +670,7 @@
     'combat.join': (c) => ({ combatId: String(c.combatId).slice(0, 64) }), // V14.90 — le bouton « Rejoindre » du combat de groupe
     'instance.switch': (c) => ({ instanceId: String(c.instanceId).slice(0, 64) }), // V14.90 — le choix d'instance du jeu (pour être dans la même que mon chef)
     'party.locate': () => ({}),
+    'festival.read': () => ({}), // V15.30 — ouvrir le panneau du Festival des Sceaux (comme le bouton de la boutique) : savoir s'il est en cours
     'ferry.skip': (c) => ({ id: String(c.id).slice(0, 64) }), // V14.96 — « passer la traversée » du bac (le bouton du jeu) // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
     'player.route': (c) => { if (!Array.isArray(c.points) || c.points.length < 1 || c.points.length > 96) throw new Error('itinéraire invalide'); return { seq: ent(c.seq), points: c.points.map((p) => { const x = Number(p.x), y = Number(p.y); if (!isFinite(x) || !isFinite(y) || x < 0 || y < 0 || x > 1e5 || y > 1e5) throw new Error('point invalide'); return { x, y }; }), sprint: c.sprint === true }; }, // V14.86 — même format que le clic-pour-se-déplacer du jeu
@@ -1239,7 +1240,24 @@
       return liste.concat(plus);
     } catch (e) { return liste; }
   }
+  // V15.30 — FESTIVAL DES SCEAUX : pendant le festival, les clefs de donjon ne comptent plus (« Les clés comptent de nouveau » à la fin) :
+  // en mode Donjons, tous les donjons connus sont ouverts sans clef — pas de farm de clefs.
+  const msT = (v) => (Number(v) > 0 && Number(v) < 1e12 ? Number(v) * 1000 : Number(v) || 0);
+  const festivalActif = () => { const f = S.festival; const now = Date.now(); return !!(f && msT(f.startsAt) <= now && now < msT(f.endsAt)); };
+  function lisFestival(ev, d) {
+    try {
+      if (!d || typeof d !== 'object' || !/festival/i.test(ev)) return;
+      const f = d.festival !== undefined ? d.festival : d.state && d.state.festival !== undefined ? d.state.festival : null;
+      const avant = festivalActif();
+      S.festival = f && f.startsAt ? { startsAt: f.startsAt, endsAt: f.endsAt } : (d.festival === null || (d.state && d.state.festival === null) ? null : S.festival); S.festivalLu = Date.now();
+      const apres = festivalActif();
+      if (apres && !avant) note('Festival des Sceaux en cours (jusqu’à ' + new Date(msT(S.festival.endsAt)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ') : donjons sans clef');
+      if (!apres && avant) note('Festival des Sceaux terminé : les clefs comptent de nouveau');
+      if (!S.vus.has('festivalFmt')) { S.vus.add('festivalFmt'); retiens('festival · ' + ev, JSON.stringify(d).slice(0, 600)); }
+    } catch (e) {}
+  }
   function traite(ev, d) {
+    lisFestival(ev, d);
     if (d && typeof d === 'object' && /inventory|item|forge|craft|equip|gear|rune|panopl|set\.|vault|stuff/i.test(ev)) { try { S.brutEq = S.brutEq || {}; const j = JSON.stringify(d); if (j.length < 600000) S.brutEq[ev] = j; } catch (e) {} }
     if (d && typeof d === 'object' && /inventory|item|forge|craft|market|shop|vault|bank|coffre|chest|equip|gear|loot|reward/i.test(ev)) { try { apprendNiveaux(d, 0); } catch (e) {} }
     // Groupe et combats d'alliés : j'apprends la forme exacte de ce que le jeu envoie (invitation, membres, combat à rejoindre) avant d'écrire l'option.
@@ -4013,7 +4031,7 @@
         // V15.24 — beaucoup de boss de donjon vivent aussi dehors (Colosse de lave au volcan…) : le donjon seulement si la quête le dit, si j'ai sa clef en sac, ou si je l'ai cherché dehors sans le trouver
         const nomD = String(dj ? nomDj(dj) : '').toLowerCase(), texte = JSON.stringify([o.label, et.title, et.text, def.summary, def.offer, def.name].filter(Boolean)).toLowerCase(), dit = !!dj && (/donjon|dungeon/.test(texte) || (nomD.length > 4 && texte.indexOf(nomD) >= 0));
         const echecDehors = ((S.vides || {})[o.mobId] || []).length >= 2 || /introuvable|aucun progrès|rien de faisable/.test(String((S.qRaison || {})[q.questId] || '')) || (S.pnjIgnore && S.pnjIgnore['zone:esp:' + o.mobId] > Date.now());
-        const aCle = !!dj && (S.inv || []).some((x) => x && x.itemId === 'clef-' + dj); // clef déjà en sac : le donjon est sûr et rapide
+        const aCle = !!dj && (festivalActif() || (S.inv || []).some((x) => x && x.itemId === 'clef-' + dj)); // clef déjà en sac : le donjon est sûr et rapide
         if (dj && !dit && !echecDehors && !aCle && especeDehors(o.mobId)) continue;
         if (dj) { const sg = dj + q.questId + JSON.stringify(q.counters || {}) + q.stepIndex; if (!S.djQueteT || S.djQueteT.sg !== sg) S.djQueteT = { sg, t: Date.now() }; if (Date.now() - S.djQueteT.t > 25 * 60000) { S.djQueteKO = { t: Date.now() + 30 * 60000 }; S.djQueteT = null; note('Donjon ' + dj + ' pour la quête : 25 min sans progrès — je fais les autres quêtes 30 min'); return ''; } if (S.djQueteDit !== dj + q.questId) { S.djQueteDit = dj + q.questId; note('Quête ' + (def.name || q.questId) + ' : ' + ((CAT[o.mobId] || {}).nom || o.mobId) + ' est le boss du donjon ' + (typeof nomDj === 'function' ? nomDj(dj) : dj) + ' — je fais ce donjon (clef en sac, sinon je la farme)'); } return dj; }
       }
@@ -4029,7 +4047,9 @@
   function clesDonjon(force) {
     const maintenant = Date.now();
     B.djKO = B.djKO || {};
-    return S.inv.filter((x) => x && x.itemId && /^clef-/.test(x.itemId)).map((x) => {
+    const enSac = S.inv.filter((x) => x && x.itemId && /^clef-/.test(x.itemId));
+    if (festivalActif()) { const ids = new Set(enSac.map((x) => x.itemId.slice(5))); entreesDj().forEach((y) => { const id = y && (y.dungeonId || y.id); if (id && !ids.has(id)) { ids.add(id); enSac.push({ itemId: 'clef-' + id, quantity: 99, festival: 1 }); } }); } // V15.30 — festival : tous les donjons connus, sans clef
+    return enSac.map((x) => {
       const id = x.itemId.slice(5), niv = nivDonjon(id), e = entreesDj().find((y) => y && (y.dungeonId || y.id) === id);
       let pas = ''; const marge = margeDj(id);
       if (niv > S.niveau - marge) pas = 'niveau ' + niv + ', trop haut (écart voulu ' + marge + ')';
@@ -7861,6 +7881,7 @@
         if (fc) { m = fc; S.pourQuete = { id: m.id, q: null }; }
       }
       if (CFG.mode === 'donjons' || (estDrarito() && CFG.mode === 'quetes' && (djQuete() || /^donjon-/.test(String(S.mapId))))) { // V15.23 — aussi pour un donjon demandé par une quête
+        if (enMonde() && (!S.festivalLu || Date.now() - S.festivalLu > 600000) && Date.now() - (S.festivalDemande || 0) > 600000) { S.festivalDemande = Date.now(); try { envoie('festival.read', {}); } catch (e) {} } // V15.30 — festival en cours ? (toutes les 10 min, comme ouvrir le panneau)
         if (/^(donjon|antre)-/.test(String(S.mapId))) { await donjon(); return; }
         if (dedans()) { await sortir(); return; }
         const voulu = djVoulu();
