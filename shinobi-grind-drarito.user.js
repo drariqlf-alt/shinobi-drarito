@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.26.0
+// @version     15.27.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.26-Drarito';
+  const VERSION = 'V15.27-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -3137,9 +3137,27 @@
     note(quoi + ' : refusé' + (r && r.d && r.d.code ? ' (' + r.d.code + ')' : ' (pas de réponse)'));
     return false;
   }
+  // V15.27 — la vraie porte de sortie, lue sur la carte du bâtiment que le jeu garde en mémoire (chaque bâtiment a la sienne : Hyūga n'est pas en 320,470)
+  function porteSortieCarte() {
+    try {
+      rafraichit();
+      const C = NAV.carte; if (!C || String(C.id || '').split('@')[0] !== S.mapId) return null;
+      const L = (C.portals || []).filter((x) => x && typeof x.tileX === 'number' && typeof x.tileY === 'number');
+      if (!L.length) return null;
+      const dest = (x) => String(x.toMapId || x.to || x.target || x.mapId || '');
+      const note2 = (x) => (/sortie/.test(String(x.id || x.portalId || '')) ? 0 : 1) + (/interieur|^donjon|^antre/.test(dest(x)) ? 2 : 0);
+      L.sort((a2, b2) => note2(a2) - note2(b2) || dist({ x: a2.tileX * 32 + 16, y: a2.tileY * 32 + 16 }, S.pos) - dist({ x: b2.tileX * 32 + 16, y: b2.tileY * 32 + 16 }, S.pos));
+      const x = L[0], h = C.height || 15;
+      if (!S.vus.has('sortieCarte:' + S.mapId)) { S.vus.add('sortieCarte:' + S.mapId); note('Sortie de ' + S.mapId.replace(PREFIXE, '') + ' lue sur la carte : ' + JSON.stringify(x).slice(0, 200)); }
+      return { x: x.tileX * 32 + 16, y: x.tileY * 32 + 16, id: x.id || x.portalId || null, vy: x.tileY >= h / 2 ? 1 : -1 };
+    } catch (e) { return null; }
+  }
   async function sortir() {
     const b = dedans();
-    const but = ((B.sortiePos || {})[S.mapId]) || { x: 320, y: 470 }; // V15.26 — l'endroit d'où la sortie a marché la dernière fois dans CE bâtiment
+    const pc = porteSortieCarte();
+    const C = NAV.carte && String(NAV.carte.id || '').split('@')[0] === S.mapId ? NAV.carte : null;
+    const repli = [((B.sortiePos || {})[S.mapId]), { x: 320, y: 470 }, C ? { x: (C.width || 20) * 16, y: ((C.height || 15) - 1) * 32 - 10 } : null, C ? { x: (C.width || 20) * 16 - 64, y: ((C.height || 15) - 1) * 32 - 10 } : null, C ? { x: (C.width || 20) * 16 + 64, y: ((C.height || 15) - 1) * 32 - 10 } : null].filter(Boolean);
+    const but = pc ? { x: pc.x, y: pc.y - 20 * pc.vy } : repli[(S.sortieEchecs || 0) % repli.length]; // sans carte : je change d'endroit à chaque échec (bas du bâtiment, au milieu puis de chaque côté) // V15.27 — la porte de la carte d'abord ; sinon l'endroit d'où la sortie a marché la dernière fois (V15.26)
     if (dist(but, S.pos) > 44 && !(S.sortieA && Date.now() - S.sortieA > 9000)) {
       if (!S.sortieA) S.sortieA = Date.now();
       statut('→ sortie du bâtiment', true);
@@ -3147,9 +3165,10 @@
     }
     S.sortieA = 0;
     const connu = B.sorties && B.sorties[S.mapId];
-    if (!(await franchit(connu || { mapId: S.mapId, portalId: 'sortie-' + b }, 'Sortie du bâtiment', but, { x: 0, y: 1 }))) {
+    const corpsS = pc && pc.id ? { mapId: S.mapId, portalId: pc.id } : (connu || { mapId: S.mapId, portalId: 'sortie-' + b });
+    if (!(await franchit(corpsS, 'Sortie du bâtiment', but, { x: 0, y: pc ? pc.vy : 1 }))) {
       S.sortieEchecs = (S.sortieEchecs || 0) + 1;
-      if (S.sortieEchecs >= 5) { S.on = false; memoriseOn(); note('Je n’arrive pas à sortir du bâtiment : sortez à la main puis relancez le bot.'); }
+      if (S.sortieEchecs >= 8) { S.on = false; memoriseOn(); note('Je n’arrive pas à sortir du bâtiment : sortez à la main puis relancez le bot.'); }
     } else {
       S.sortieEchecs = 0;
       try { const sf = S.dernierFranchi; if (sf && sf.map && sf.map.indexOf(PREFIXE) === 0) { B.sortiePos = B.sortiePos || {}; B.sortiePos[sf.map] = { x: Math.round(sf.x), y: Math.round(sf.y) }; sauveB(); } } catch (e) {}
