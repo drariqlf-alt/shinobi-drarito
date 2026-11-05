@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.25.0
+// @version     15.25.1
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.25-Drarito';
+  const VERSION = 'V15.25.1-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -3441,6 +3441,23 @@
     }
     return null;
   }
+  // Drarito — V15.25.1 : aller-retour sans fin entre deux îles (journal du 05/11 : Sceau de Tanzaku ↔ Sceau des cavernes scellées
+  // toutes les 6 s pendant 9 min — sur une île le but choisi était sur l'autre, et inversement). Après un aller puis un retour
+  // en moins de 4 min, la 3e traversée vers la même île est refusée et cette île est mise de côté 15 min : je fais ce qu'il y a ici.
+  const ileBloquee = (w) => !!(estDrarito() && w && ((S.ileBloc || {})[w] || 0) > Date.now());
+  function retiensSautIle(de, vers) {
+    if (!estDrarito() || !de || !vers || de === vers) return;
+    const now = Date.now();
+    S.sautsIle = (S.sautsIle || []).filter((x) => now - x.t < 240000); S.sautsIle.push({ de, vers, t: now });
+  }
+  function bouclerIle(wB) {
+    if (!estDrarito() || !wB || !S.mapId || wB === S.mapId) return false;
+    const now = Date.now(), h = (S.sautsIle || []).filter((x) => now - x.t < 240000);
+    if (!h.some((x) => x.de === S.mapId && x.vers === wB) || !h.some((x) => x.de === wB && x.vers === S.mapId)) return false;
+    (S.ileBloc = S.ileBloc || {})[wB] = now + 900000; S.sautsIle = [];
+    note('Aller-retour en boucle entre ' + String(S.mapId).replace(/^world-/, '') + ' et ' + wB.replace(/^world-/, '') + ' : je laisse ' + wB.replace(/^world-/, '') + ' de côté 15 min et je fais ce qu’il y a ici');
+    return true;
+  }
   async function voyageSceau(but, zoneBut) {
     const maintenant = Date.now();
     const ileAutre = estDrarito() && enMonde() && (() => { const w = mondeBut(but, zoneBut); return !!(w && w !== S.mapId); })(); // V14.94
@@ -3454,6 +3471,8 @@
     if (basNivDrarito()) { // Drarito — seulement un sceau qui me dépose à moins de 8 000 px du but, et plus près que là où je suis ; sinon pas de voyage
       const wB = mondeBut(but, zoneBut);
       if (wB && wB !== S.mapId) { // V14.94 — le but est sur une autre île : sceau de cette île, quelle que soit la « distance » (elle ne veut rien dire d'une île à l'autre)
+        if (ileBloquee(wB) || bouclerIle(wB)) return false; // Drarito — V15.25.1 : pas de ping-pong entre deux îles
+        const deIle = S.mapId;
         const sp = maintenant < (S.tpA || 0) ? null : sceauPourDrarito(Object.assign({}, but, { w: wB, z: zoneBut || but.z }));
         if (!sp) {
           const pasR = routeIle(wB);
@@ -3462,7 +3481,7 @@
             stop(); S.tpA = maintenant + 60000; note('Sceau : étape vers ' + wB.replace(/^world-/, '') + ' — ' + (pasR.s.name || pasR.s.id) + ' puis le bac');
             S.tpZone = true; try { envoie('teleport.remote', { destinationId: pasR.s.id }); } finally { S.tpZone = false; }
             const rE = await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500); await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
-            if (rE && rE.ev === 'world.joined') S.tpA = Date.now() + 5000; // V15.20
+            if (rE && rE.ev === 'world.joined') { S.tpA = Date.now() + 5000; retiensSautIle(deIle, S.mapId); } // V15.20
             return true;
           }
           const bac = pasR && pasR.type === 'bac' ? pasR.p : null;
@@ -3496,6 +3515,7 @@
         const r1 = await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope !== 'combat'), 3500);
         await dort(900); NAV.route = []; NAV.but = null; NAV.prog = null;
         if (!r1 || r1.ev === 'server.error') { B.tpKO[sp.s.id] = maintenant + 1800000; note('Sceau : voyage vers ' + (sp.s.name || sp.s.id) + ' refusé (' + (r1 ? r1.d.code : 'pas de réponse') + ')'); return false; }
+        retiensSautIle(deIle, S.mapId); // Drarito — V15.25.1
         S.tpA = Date.now() + 5000; // V15.20 — arrivé : l'étape suivante (autre sceau, bac) peut suivre presque tout de suite (il restait immobile 60 s)
         return true;
       }
@@ -3541,6 +3561,7 @@
   async function rappel(but, npcId) {
     if (zoneFarm()) return false; // V14.78 — farm fixé : le parchemin renvoyait à Kumo, à l'autre bout de la carte
     if (!Number(CFG.rappel) || !enMonde() || Date.now() < (S.rappelA || 0)) return false;
+    if (ileBloquee(mondeBut(but, npcId ? NPCZ[npcId] : null))) return false; // Drarito — V15.25.1 : île mise de côté (aller-retour en boucle)
     const r = B.rappel || {};
     if (r.ko) return false;
     const d = dist(but, S.pos);
@@ -3548,13 +3569,14 @@
     if (r.x != null ? dist(r, but) > d - 1500 : !(S.village && String(npcId).indexOf('-' + S.village) >= 0)) return false;
     const slot = S.inv.find((x) => x && x.itemId === 'parchemin-de-rappel' && x.quantity > 0);
     if (!slot) return false;
-    const avant = { x: S.pos.x, y: S.pos.y };
+    const avant = { x: S.pos.x, y: S.pos.y }, deIle = S.mapId;
     stop();
     statut('Parchemin de rappel');
     envoie('inventory.use', { index: slot.index });
     const rep = await attend((ev, x) => ev === 'world.joined' || (ev === 'server.error' && x.scope === 'inventory'), 3000);
     await dort(900);
     S.rappelA = Date.now() + 90000;
+    if (enMonde()) retiensSautIle(deIle, S.mapId); // Drarito — V15.25.1 : le rappel change aussi d'île
     const saut = dist(avant, S.pos);
     if (saut > 400 && enMonde()) { B.rappel = { x: Math.round(S.pos.x), y: Math.round(S.pos.y) }; note('Parchemin de rappel : téléporté de ' + Math.round(saut) + ' px, arrivée en ' + B.rappel.x + ',' + B.rappel.y); }
     else if (!enMonde()) { note('Parchemin de rappel : arrivée dans « ' + S.mapId + ' »'); }
@@ -6956,7 +6978,7 @@
   const passageVers = (w) => (w && ((B.passages || {})[S.mapId + '>' + w] || routeIle(w))) || null; // V14.95 — passage écrit sur la carte, ou bac
   function atteignableQuete(p, zone) {
     const wP = p && mondeBut(p, zone);
-    if (wP && enMonde() && wP !== S.mapId) return !!(sceauPourDrarito(Object.assign({}, p, { w: wP })) || passageVers(wP)); // V14.95 — autre île : un sceau ou un passage connu, sinon non
+    if (wP && enMonde() && wP !== S.mapId) return !ileBloquee(wP) && !!(sceauPourDrarito(Object.assign({}, p, { w: wP })) || passageVers(wP)); // V14.95 — autre île : un sceau ou un passage connu, sinon non
     if (atteignable(p, zone)) return true;
     if (!p || !S.pos) return true;
     if ((!p.w || p.w === S.mapId) && dist(p, S.pos) <= 60000 && !bloqueAppris(p) && !zoneTropHaute(p)) return true;
