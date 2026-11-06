@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.30.0
+// @version     15.31.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.30-Drarito';
+  const VERSION = 'V15.31-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -222,7 +222,8 @@
     B.pnj = B.pnj || {}; Object.keys(APPRIS_DR.pnj).forEach((k) => { if (!B.pnj[k] || !B.pnj[k].exact || !/^world-/.test(String(B.pnj[k].carte || ''))) B.pnj[k] = APPRIS_DR.pnj[k]; });
     B.vuEsp = B.vuEsp || {}; Object.keys(APPRIS_DR.vuEsp).forEach((k) => { const L = B.vuEsp[k] = B.vuEsp[k] || []; APPRIS_DR.vuEsp[k].forEach((p) => { if (!L.some((q) => q.w === p.w && Math.abs(q.x - p.x) < 700 && Math.abs(q.y - p.y) < 700)) L.push(Object.assign({}, p, { t: Math.max(p.t || 0, Date.now() - 7 * 86400000) })); }); });
     B.boss = B.boss || {}; Object.keys(APPRIS_DR.boss).forEach((k) => { const b = B.boss[k] = B.boss[k] || {}; if (b.x == null || !b.w) Object.assign(b, APPRIS_DR.boss[k]); });
-    B.sceauxPos = B.sceauxPos || {}; Object.keys(APPRIS_DR.sceauxPos).forEach((k) => { if (!B.sceauxPos[k]) B.sceauxPos[k] = APPRIS_DR.sceauxPos[k]; });
+    B.sceauxPos = B.sceauxPos || {}; Object.keys(B.sceauxPos).forEach((k) => { const v = B.sceauxPos[k]; if (v && v.carte && !v.ok && !v.tp) delete B.sceauxPos[k]; }); /* V15.31 — places tirées du schéma de la carte du monde : fausses, oubliées */ if (!B.sceauxPos['sceau-konoha']) B.sceauxPos['sceau-konoha'] = { x: 39856, y: 31472, tp: 1 };
+    Object.keys(APPRIS_DR.sceauxPos).forEach((k) => { if (!B.sceauxPos[k]) B.sceauxPos[k] = APPRIS_DR.sceauxPos[k]; });
     B.zoneVue = B.zoneVue || {}; Object.keys(APPRIS_DR.zoneVue || {}).forEach((z) => { const L = B.zoneVue[z] = B.zoneVue[z] || []; APPRIS_DR.zoneVue[z].forEach((p) => { if (!L.some((q) => q.w === p.w && Math.abs(q.x - p.x) < 600 && Math.abs(q.y - p.y) < 600)) L.push(p); }); });
     B.zoneMonde = Object.assign({}, APPRIS_DR.zoneMonde || {}, B.zoneMonde || {});
     if (B.vuEsp && B.vuEsp['maitresse-des-chaines']) B.vuEsp['maitresse-des-chaines'] = B.vuEsp['maitresse-des-chaines'].filter((p) => !(p.x === 11024 && p.y === 7504)); // V15.19 — elle n'est pas à l'entrée de l'antre de Saiken (elle est dans les Ruines, en groupe « élite », et dans l'antre lui-même)
@@ -2134,7 +2135,8 @@
         B.sceauxPos = B.sceauxPos || {}; B.sceauxNoms = B.sceauxNoms || {};
         const q = { x: Math.round(x.x * 32), y: Math.round(x.y * 32), carte: 1 }, v = B.sceauxPos[id];
         if (x.name) B.sceauxNoms[id] = x.name;
-        if (!v || (!v.ok && (v.x !== q.x || v.y !== q.y))) { B.sceauxPos[id] = Object.assign(q, v && v.ok ? { ok: 1 } : {}); nb++; }
+        if (estDrarito()) { (B.sceauxCarte = B.sceauxCarte || {})[id] = q; return; } // V15.31 — la carte du monde du jeu est un schéma, pas à l'échelle (Honoha y est en 22064,17744, en vrai 39856,31472) : je ne m'en sers plus pour situer les sceaux
+        if (!v || (!v.ok && !v.tp && (v.x !== q.x || v.y !== q.y))) { B.sceauxPos[id] = Object.assign(q, v && v.ok ? { ok: 1 } : {}); nb++; }
       });
       if (nb) { S.zonesSales = true; if (!S.vus.has('sceauxCarte')) { S.vus.add('sceauxCarte'); note('Carte du jeu : ' + nb + ' sceau(x) de téléportation situé(s) (nom et place exacte)'); } }
     } catch (e) {}
@@ -3463,7 +3465,8 @@
   // Il ne le fait que si cela raccourcit vraiment la route, et retient où chaque sceau le dépose.
   function lieuSceau(x) {
     const p = (B.sceauxPos || {})[x.id];
-    if (p) return p;
+    if (p && !(estDrarito() && p.carte && !p.ok && !p.tp)) return p;
+    if (estDrarito()) { const w = mondeDeZone(x.mapId), L = ((B.zoneVue || {})[x.mapId] || []).filter((q) => !q.w || q.w === w); if (L.length) return { x: L[0].x, y: L[0].y, approx: 1 }; } // V15.31 — à défaut : un endroit où j'ai vraiment été dans la zone du sceau
     if (x.mapId === 'village-de-' + S.village && B.rappel && B.rappel.x != null) return B.rappel;
     const o = origineZone(x.mapId), Z = ZONES[x.mapId];
     return o && Z ? { x: o.x + Z.w * 16, y: o.y + Z.h * 16 } : null;
@@ -7053,10 +7056,11 @@
   function routeIle(w) { // V15.9 — le premier pas pour aller sur l'île w : un sceau (coût 1) ou un bac (coût 2 + la marche jusqu'au passeur), ou null
     if (!w || !enMonde() || w === S.mapId) return null;
     const L = passeurs(), sc = Number(CFG.sceaux) ? (S.sceaux || []).filter((x) => x.discovered && x.cost != null && (S.ryo == null || x.cost <= S.ryo) && !((B.tpKO || {})[x.id] > Date.now())) : [];
-    const marche = (n, p) => (n.zone && n.zone === p.de ? 0.1 : n.pos ? dist(n.pos, p) / 15000 : 4), trop = (n, p) => !!(n.pos && !(n.zone && n.zone === p.de) && dist(n.pos, p) > 16000);
-    const file = [{ ile: S.mapId, c: 0, premier: null, pos: S.pos, zone: JEU.zone || null }]; let mieux = null;
-    for (let n = 0; file.length && n < 400; n++) {
+    const marche = (n, p) => (n.zone && n.zone === p.de ? 0.1 : n.pos ? dist(n.pos, p) / 15000 : 4), trop = (n, p) => !!(n.pos && !(n.zone && n.zone === p.de) && dist(n.pos, p) > (estDrarito() ? 70000 : 16000)); // V15.31 — le continent fait 90 000 px : un bac à 47 000 px reste joignable (le temps de marche est compté dans le coût)
+    const file = [{ ile: S.mapId, c: 0, premier: null, pos: S.pos, zone: JEU.zone || null }]; let mieux = null; const vusR = new Set();
+    for (let n = 0; file.length && n < 3000; n++) {
       file.sort((a, b) => a.c - b.c); const cur = file.shift();
+      const cleN = cur.ile + '|' + (cur.zone || '') + '|' + (cur.pos ? Math.round(cur.pos.x / 2000) + ',' + Math.round(cur.pos.y / 2000) : ''); if (vusR.has(cleN)) continue; vusR.add(cleN); // V15.31 — chaque étape une seule fois (24 sceaux × 24 sceaux épuisaient la recherche avant le bac des Dunes brûlantes)
       if (cur.ile === w) { mieux = cur; break; }
       if (cur.c > 12) break;
       L.filter((p) => p.w === cur.ile && !trop(cur, p)).forEach((p) => file.push({ ile: p.vers, c: cur.c + 2 + marche(cur, p), premier: cur.premier || { type: 'bac', p }, pos: null, zone: p.zone }));
