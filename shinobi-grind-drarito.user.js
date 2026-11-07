@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.32.0
+// @version     15.33.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.32-Drarito';
+  const VERSION = 'V15.33-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1196,7 +1196,7 @@
     S.combat.cible = mobAdv ? mobAdv.id.slice(2) : null;
     S.combat.hpDebut = moi.hp;
     try { const dj = (/^donjon-(.+)-\d+$/.exec(String(S.mapId)) || [])[1]; if (dj && !((B.djNiv || {})[dj])) { const nv = Math.max(0, ...adv.map((e) => e.level || 0)); if (nv > 0) { B.djNiv = B.djNiv || {}; B.djNiv[dj] = nv; sauveB(); } } } catch (e) {}
-    S.combat.info = { nom: adv.map((e) => e.name).join(' + '), niv: Math.max(0, ...adv.map((e) => e.level || 0)) };
+    S.combat.info = { nom: adv.map((e) => e.name).join(' + '), niv: Math.max(0, ...adv.map((e) => e.level || 0)), tot: adv.reduce((t, e) => t + (e.level || 0), 0) };
     S.combat.debut = Date.now(); S.combat.subi = {};
     S.combat.especes = adv.filter((e) => e.kind === 'mob').map((e) => e.mobId || e.name);
     adv.filter((e) => e.kind === 'mob').forEach((e) => {
@@ -1412,6 +1412,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV29 !== 1) { CFG.drV29 = 1; Object.assign(CFG, { nivGroupe: 950, nivGroupeMin: 710, nivGroupeAuto: { ref: Math.max(188, S.niveau || 188), cap: 950 } }); S.cibleId = null; sauve(); note('Drarito : groupes de 710 à 950 niveaux au total (tu viens de battre 5 Ombres des cendres facilement), et la borne monte avec ton niveau (baisse de 50 après une défaite contre un gros groupe) — Réglages → Combat pour changer'); } // V15.33
       if (estDrarito() && CFG.drV28 !== 1) { CFG.drV28 = 1; CFG.points = 'espritmax'; CFG.espritSeul = 1; S.depenseKO = 0; S.barDerT = 0; sauve(); note('Drarito : tout en Esprit et seulement les techniques Esprit. Pour récupérer les points déjà mis en Katon et Vitalité : « Refaire sa feuille » dans le jeu (gratuit), je replace tout en Esprit.'); } // V15.1
       if (estDrarito() && CFG.drV27 !== 1) { CFG.drV27 = 1; sauve(); let n = 0; Object.keys(B.especes || {}).forEach((k) => { const L = B.especes[k] && B.especes[k].lieu; if (L && !L.w) { delete B.especes[k].lieu; n++; } }); Object.keys(B.boss || {}).forEach((k) => { if (B.boss[k] && B.boss[k].x != null && !B.boss[k].w) { delete B.boss[k].x; delete B.boss[k].y; } }); sauveB(); note('Carte : ' + n + ' coins de chasse sans île connue oubliés (ils se réapprennent au premier combat) — fini les trajets vers une autre île à pied'); } // V14.98
       if (estDrarito() && CFG.drV26 !== 1) { CFG.drV26 = 1; if (CFG.suivreGroupe == null) CFG.suivreGroupe = 1; sauve(); } // V14.89
@@ -1808,7 +1809,7 @@
         if (c.humains && c.coups > 2 && B.degMoy > 0) { B.pvpRatio = lisse(B.pvpRatio, Math.max(0.1, Math.min(1.2, (c.deg / c.coups) / B.degMoy)), 0.5); B.pvp = B.pvp || { v: 0, d: 0 }; B.pvp[gagne ? 'v' : 'd']++; }
         if (gagne) { S.victoires++; note('Victoire contre ' + c.info.nom + ' niv.' + c.info.niv + (c.coups ? ' · ' + Math.round(c.deg / c.coups) + ' dégâts par coup' : '') + ' · ' + Math.round(c.subiTotal || 0) + ' PV perdus · +' + gainXp + ' XP en ' + Math.round(duree) + ' s'); }
         else if (fantome) note(nonJoue ? 'Défaite contre ' + c.info.nom + ' : ' + c.perdus + ' de mes ' + (c.mesTours || 0) + ' tours sont passés sans que je joue — ce n’est pas une vraie défaite, je ne l’évite pas' : 'Combat terminé en ' + Math.round(duree) + ' s sans que j’aie joué ni perdu de PV contre ' + c.info.nom + ' : ce n’est pas une vraie défaite, je ne l’évite pas');
-        else { S.defaites = (S.defaites || 0) + 1; S.derDef = { nom: c.info.nom, niv: c.info.niv, t: Date.now() }; S.cibleId = null; if (/^donjon-/.test(String(S.mapId))) { const dj = String(S.mapId).replace(/^donjon-/, '').replace(/-\d+$/, ''); B.djKO = B.djKO || {}; B.djPerdu = B.djPerdu || {}; { const st = (B.djStats || {})[dj], D = B.djDefs = B.djDefs || {}; D[dj] = (D[dj] || []).filter((t) => Date.now() - t < 86400000).concat([Date.now()]); if (st && st.n >= 8 && D[dj].length < 2) { B.djKO[dj] = Date.now() + 45 * 60000; note('Donjon ' + nomDj(dj) + ' : défaite isolée (' + st.n + ' passages réussis avant) — je le reprends dans 45 min'); } else { B.djKO[dj] = Date.now() + 6 * 3600000; B.djPerdu[dj] = (S.niveau || 0) + 5; } } retiens('défaite donjon ' + S.mapId, c.info.nom + ' niv.' + c.info.niv); sauveB(); } note('Défaite contre ' + c.info.nom + ' niv.' + c.info.niv + (c.perdus ? ' — ' + c.perdus + ' de mes tours sont passés sans que je joue (voir « TOUR PERDU »)' : '') + ' : je l’évite désormais et je continue'); if (S.niveau && c.info.niv > S.niveau + 8 && enMonde() && S.pos) { B.dangers = (B.dangers || []).filter((d) => Math.abs(d.x - S.pos.x) > 600 || Math.abs(d.y - S.pos.y) > 600).slice(-40); B.dangers.push({ x: Math.round(S.pos.x), y: Math.round(S.pos.y), niv: c.info.niv }); sauveB(); note('Zone dangereuse retenue ici (ennemis niv. ' + c.info.niv + ') : je n’y retourne pas pour un sceau tant que je n’ai pas monté'); NAV.route = []; NAV.but = null; S.objTenu = null; } }
+        else { S.defaites = (S.defaites || 0) + 1; S.derDef = { nom: c.info.nom, niv: c.info.niv, t: Date.now() }; try { const A = CFG.nivGroupeAuto, cap = Number(CFG.nivGroupe) || 0; if (estDrarito() && A && cap === A.cap && c.info.tot >= 0.85 * cap && !/^donjon-/.test(String(S.mapId))) { const nc = Math.max(300, Math.min(cap - 50, c.info.tot - 30)); Object.assign(CFG, { nivGroupe: nc, nivGroupeMin: Math.round(0.75 * nc) }); CFG.nivGroupeAuto = { ref: Math.max(S.niveau || 0, A.ref) + 2, cap: nc }; sauve(); note('Groupes : défaite contre ' + c.info.tot + ' niveaux au total — je descends la borne à ' + nc + ' (elle remontera avec mon niveau)'); } } catch (e) {} /* V15.33 */ S.cibleId = null; if (/^donjon-/.test(String(S.mapId))) { const dj = String(S.mapId).replace(/^donjon-/, '').replace(/-\d+$/, ''); B.djKO = B.djKO || {}; B.djPerdu = B.djPerdu || {}; { const st = (B.djStats || {})[dj], D = B.djDefs = B.djDefs || {}; D[dj] = (D[dj] || []).filter((t) => Date.now() - t < 86400000).concat([Date.now()]); if (st && st.n >= 8 && D[dj].length < 2) { B.djKO[dj] = Date.now() + 45 * 60000; note('Donjon ' + nomDj(dj) + ' : défaite isolée (' + st.n + ' passages réussis avant) — je le reprends dans 45 min'); } else { B.djKO[dj] = Date.now() + 6 * 3600000; B.djPerdu[dj] = (S.niveau || 0) + 5; } } retiens('défaite donjon ' + S.mapId, c.info.nom + ' niv.' + c.info.niv); sauveB(); } note('Défaite contre ' + c.info.nom + ' niv.' + c.info.niv + (c.perdus ? ' — ' + c.perdus + ' de mes tours sont passés sans que je joue (voir « TOUR PERDU »)' : '') + ' : je l’évite désormais et je continue'); if (S.niveau && c.info.niv > S.niveau + 8 && enMonde() && S.pos) { B.dangers = (B.dangers || []).filter((d) => Math.abs(d.x - S.pos.x) > 600 || Math.abs(d.y - S.pos.y) > 600).slice(-40); B.dangers.push({ x: Math.round(S.pos.x), y: Math.round(S.pos.y), niv: c.info.niv }); sauveB(); note('Zone dangereuse retenue ici (ennemis niv. ' + c.info.niv + ') : je n’y retourne pas pour un sceau tant que je n’ai pas monté'); NAV.route = []; NAV.but = null; S.objTenu = null; } }
         const pq = S.pourQuete && c.cible === S.pourQuete.id ? S.pourQuete.q : null;
         if (pq) { // trois défaites sur une même quête : on passe à une autre
           S.echecsQuete = S.echecsQuete || {};
@@ -1936,7 +1937,7 @@
   // (ex. 3 × niv. 50 : 3 % de PV perdus) ; l'estimation des chances, trop prudente, rejetait ces groupes et le bot « cherchait » 10 min.
   function nivGroupe(m) { const ks = especesDe(m) || []; let t = 0, mx = 0; ks.forEach((k) => { const n = (B.especes[k] || CAT[k] || {}).niv || 0; t += n; if (n > mx) mx = n; }); return { t, mx, nb: ks.length }; }
   const plafondGroupe = () => (estDrarito() ? Number(CFG.nivGroupe) || 0 : 0);
-  const groupeSur = (m) => { const P = plafondGroupe(); if (!P || !S.niveau) return false; const g = nivGroupe(m); return g.t > 0 && g.t <= P && g.mx <= S.niveau + (Number(CFG.nivGroupeMin) ? 35 : 2); }; // V14.76 — avec une borne basse réglée : ennemis jusqu'à +35 niveaux (le joueur bat 2 × niv. 104-109 au niv. 83)
+  const groupeSur = (m) => { const P = plafondGroupe(); if (!P || !S.niveau) return false; const g = nivGroupe(m); if ((especesDe(m) || []).some((k) => /boss/i.test(String((CAT[k] || {}).rang || '')))) return false; /* V15.33 — un groupe avec un boss (Écho d’Indra + 3 guerriers d’os, 790 niveaux) : l'estimation décide, pas le budget de niveaux */ return g.t > 0 && g.t <= P && g.mx <= S.niveau + (Number(CFG.nivGroupeMin) ? 35 : 2); }; // V14.76 — avec une borne basse réglée : ennemis jusqu'à +35 niveaux (le joueur bat 2 × niv. 104-109 au niv. 83)
   const groupeInteressant = (m) => { const P = plafondGroupe(); if (!P) return false; const g = nivGroupe(m), mn = Number(CFG.nivGroupeMin) || 0; return mn ? g.t >= mn : (g.t >= 0.6 * P || g.mx >= (S.niveau || 0) - 10); };
   const zoneFarm = () => (estDrarito() && CFG.mode === 'xp' && CFG.zoneFarm ? String(CFG.zoneFarm) : ''); // V14.76 — zone(s) de farm imposée(s), séparées par des virgules
   const dansZoneFarm = (z) => zoneFarm().split(',').map((x) => x.trim()).filter(Boolean).indexOf(String(z)) >= 0;
@@ -8973,6 +8974,12 @@
     tgDit('🛠 ' + quoi + '\nEn ce moment : ' + (S.statut || '—'));
   }
   setInterval(() => { garde().catch(() => {}); }, 5000);
+  setInterval(() => { // V15.33 — la borne des groupes suit mon niveau (+4,8 niveaux de groupe par niveau gagné), tant que vous ne l'avez pas changée à la main
+    try {
+      const A = CFG.nivGroupeAuto; if (!estDrarito() || !A || !S.niveau || Number(CFG.nivGroupe) !== A.cap) return;
+      if (S.niveau > A.ref) { const nc = Math.round((A.cap + (S.niveau - A.ref) * 4.8) / 10) * 10; if (nc > A.cap) { Object.assign(CFG, { nivGroupe: nc, nivGroupeMin: Math.round(0.75 * nc) }); CFG.nivGroupeAuto = { ref: S.niveau, cap: nc }; sauve(); note('Groupes : niveau ' + S.niveau + ' — je vise maintenant des groupes de ' + CFG.nivGroupeMin + ' à ' + nc + ' niveaux au total'); } else CFG.nivGroupeAuto = { ref: S.niveau, cap: A.cap }; }
+    } catch (e) {}
+  }, 30000);
   const memoire = () => { sauveB(); sauvePas(); return JSON.stringify({ v: 1, quand: Date.now(), version: VERSION, best: JSON.stringify(B), pas: localStorage.getItem('__sg_pas'), grille: localStorage.getItem('__sg_grille'), iles: (() => { try { if (GSALE.size) { carteSale = 1; sauveCarte(); } } catch (e) {} const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^__sg_(grille|pas):world-/.test(k)) o[k] = localStorage.getItem(k); } return o; })() }); }; // V15.7 — avec la carte de chaque île
   function restaure(texte) { // remet en place une sauvegarde : passages, zones situées, routes fluides, carte, bestiaire
     const d = JSON.parse(texte);
