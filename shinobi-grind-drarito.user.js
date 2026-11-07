@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.33.0
+// @version     15.34.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.33-Drarito';
+  const VERSION = 'V15.34-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -6834,7 +6834,7 @@
     const seuil = RARETES.indexOf(CFG.venteRar), now = Date.now();
     const aVendre = (x) => aVendreInutile(x) || (seuil >= 0 && aVendreCouleur(x, seuil));
     const sig = (S.coffre || []).length + ':' + S.inv.filter((x) => x && x.itemId).length + ':' + Object.keys(RAR).length;
-    if ((seuil < 0 && Number(CFG.venteInutile) !== 1) || S.combat || !enMonde() || (now < (S.vcA || 0) && sig === S.vcSig) || !S.equip) return false;
+    if ((seuil < 0 && Number(CFG.venteInutile) !== 1) || S.combat || (!enMonde() && !(estDrarito() && S.drVente && dedans())) || (now < (S.vcA || 0) && sig === S.vcSig) || !S.equip) return false; // V15.34 — tournée de vente en cours : je vends aussi DANS le bâtiment du marchand (Tsubaki est dans la résidence du Hokage : il entrait, ressortait aussitôt pour le donjon, et recommençait)
     S.vcSig = sig; // le coffre, le sac ou les couleurs connues ont changé : je regarde tout de suite
     if (seuil >= 0 && !Object.keys(RAR).length && Number(CFG.venteInutile) !== 1) { S.vcA = now + 20000; return false; }
     if (estDrarito() && (zoneFarm() || CFG.mode === 'quetes')) return false; // V15.20 — rush quêtes : pas de tournée de vente (elle l'enfermait dans Ichiraku et bloquait la quête en cours) · V14.78 — farm fixé : jamais de tournée de vente hors de la zone (rien n'est vendable de toute façon tant que les couleurs sont inconnues)
