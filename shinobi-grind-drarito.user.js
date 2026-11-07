@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.31.0
+// @version     15.32.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.31-Drarito';
+  const VERSION = 'V15.32-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1356,6 +1356,7 @@
       const avant = new Set((S.sceaux || []).filter((x) => x.discovered).map((x) => x.id));
       d.seals.forEach((x) => { if (x.discovered && S.sceaux && !avant.has(x.id)) note('Sceau de téléportation découvert : ' + x.name); });
       S.sceaux = completeSceaux(d.seals); S.sceauxT = Date.now();
+      try { if (ev === 'teleport.window' && d.sealId && S.pos && enMonde()) { B.sceauxPos = B.sceauxPos || {}; const v = B.sceauxPos[d.sealId]; if (!v || v.carte || dist(v, S.pos) > 300) { B.sceauxPos[d.sealId] = { x: Math.round(S.pos.x), y: Math.round(S.pos.y), w: S.mapId, ok: 1 }; sauveB(); } } } catch (e) {} // V15.32 — fenêtre d'un sceau ouverte (par vous ou par moi) : je suis à côté de lui, sa vraie place est retenue
       if (typeof d.ryo === 'number') { S.ryo = d.ryo; if (S.ryoDebut == null) S.ryoDebut = d.ryo; }
     }
     if (ev === 'chat.message') relaieTchat(d);
