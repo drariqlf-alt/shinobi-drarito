@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.36.0
+// @version     15.37.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.36-Drarito';
+  const VERSION = 'V15.37-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1376,7 +1376,7 @@
       try {
         const dj = /^(donjon|antre)-/.test(String(d.mapId)) ? djDe(d.mapId) : null;
         if (dj && (!S.djRun || S.djRun.id !== dj)) { const v = S.djVers && S.djVers.id === dj && Date.now() - S.djVers.t < 900000 ? S.djVers.t : Date.now(); S.djVers = null; S.djRun = { id: dj, t: v, entre: Date.now(), xp0: S.xp || 0, coffre: 0, combat: 0, nb: 0 }; if (S.djRefus) S.djRefus[dj] = 0; S.cleDonnee = null; }
-        if (dj) { if (S.djRefus) S.djRefus[dj] = 0; S.cleDonnee = null; } // V15.36 — je suis entré : la clef a marché (avant, l'entrée suivante comptait comme un refus et le donjon était mis en pause 1 h au 3e passage)
+        if (dj) { if (S.djRefus) S.djRefus[dj] = 0; S.cleDonnee = null; if (B.djKO && B.djKO[dj] && !((B.djPerdu || {})[dj] > (S.niveau || 0))) delete B.djKO[dj]; } // V15.37 — je suis dedans : toute pause « refus » de ce donjon tombe // V15.36 — je suis entré : la clef a marché (avant, l'entrée suivante comptait comme un refus et le donjon était mis en pause 1 h au 3e passage)
         else if (!dj && S.djRun && /^world-/.test(String(d.mapId))) { // V15.36 — retour dehors sur n'importe quelle île (avant : seulement « world-exterieur », le passage n'était jamais compté)
           const r = S.djRun, min = (Date.now() - r.t) / 60000, xp = (S.xp || 0) - r.xp0 + r.coffre;
           S.djRun = null; S.djMin = (S.djMin || 0) + min; S.xpDjCombat = (S.xpDjCombat || 0) + (xp - r.coffre);
@@ -1385,6 +1385,7 @@
             st.ph = { dehors: Math.round((r.entre - r.t) / 1000), combat: Math.round(r.combat / 1000), salles: Math.max(0, Math.round((Date.now() - r.entre - r.combat) / 1000)), nb: r.nb };
             st.n++; st.xpm = st.n === 1 ? xp / min : 0.7 * st.xpm + 0.3 * (xp / min); st.der = Math.round(min * 10) / 10; st.tr = 1; st.t = Date.now(); sauveB();
             S.nbDj = (S.nbDj || 0) + 1;
+            if (B.djKO) delete B.djKO[r.id]; if (B.djPerdu) delete B.djPerdu[r.id]; // V15.37 — passage réussi : aucune pause ne tient
             note('Donjon ' + r.id + ' terminé en ' + dureeTxt(min * 60000) + ' · +' + court(xp) + ' XP (' + court(xp / min) + ' XP/min)');
           }
         }
@@ -1413,6 +1414,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV31 !== 1) { CFG.drV31 = 1; sauve(); const v = String(CFG.djChoisi || ''); if (v && (B.djKO || {})[v]) { delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; sauveB(); note('Donjon ' + v + ' : la pause venait de faux refus (corrigés en V15.36) — je la lève et je l’enchaîne'); } } // V15.37
       if (estDrarito() && CFG.drV30 !== 1) { CFG.drV30 = 1; sauve(); const v = String(CFG.djChoisi || ''); if (v && ((B.djPerdu || {})[v] || (B.djKO || {})[v])) { if (B.djPerdu) delete B.djPerdu[v]; if (B.djKO) delete B.djKO[v]; sauveB(); note('Donjon ' + v + ' : pause après une défaite levée — je le reprends'); } } // V15.35
       if (estDrarito() && CFG.drV29 !== 1) { CFG.drV29 = 1; Object.assign(CFG, { nivGroupe: 950, nivGroupeMin: 710, nivGroupeAuto: { ref: Math.max(188, S.niveau || 188), cap: 950 } }); S.cibleId = null; sauve(); note('Drarito : groupes de 710 à 950 niveaux au total (tu viens de battre 5 Ombres des cendres facilement), et la borne monte avec ton niveau (baisse de 50 après une défaite contre un gros groupe) — Réglages → Combat pour changer'); } // V15.33
       if (estDrarito() && CFG.drV28 !== 1) { CFG.drV28 = 1; CFG.points = 'espritmax'; CFG.espritSeul = 1; S.depenseKO = 0; S.barDerT = 0; sauve(); note('Drarito : tout en Esprit et seulement les techniques Esprit. Pour récupérer les points déjà mis en Katon et Vitalité : « Refaire sa feuille » dans le jeu (gratuit), je replace tout en Esprit.'); } // V15.1
@@ -7920,7 +7922,8 @@
         if (voulu && enMonde()) { // V11.29 — un donjon choisi : je l'enchaîne tant que j'ai sa clef, sinon je farme sa clef
           { // V12.17 — donjon choisi mis en pause pour un souci technique (sortie introuvable, refus, niveau illisible) : 30 min au plus, pas 4 à 12 h
             const ko = (B.djKO || {})[voulu], perdu = (B.djPerdu || {})[voulu];
-            if (ko && !(perdu > S.niveau) && ko - Date.now() > 1800000 && nbEnSac('clef-' + voulu) > 0 && (S.djClamp = S.djClamp || {}, (S.djClamp[voulu] = (S.djClamp[voulu] || 0) + 1) <= 3)) { B.djKO[voulu] = Date.now() + 1800000; sauveB(); note('Donjon choisi ' + nomDj(voulu) + ' : pause ramenée à 30 min (' + nbEnSac('clef-' + voulu) + ' clef(s) en sac)'); }
+            if (estDrarito() && ko && !(perdu > S.niveau) && ko - Date.now() > 120000 && nbEnSac('clef-' + voulu) > 0) { B.djKO[voulu] = Date.now() + 120000; sauveB(); note('Donjon choisi ' + nomDj(voulu) + ' : pause ramenée à 2 min (' + nbEnSac('clef-' + voulu) + ' clefs en sac) — je ne fais que ce donjon'); } // V15.37
+            else if (ko && !(perdu > S.niveau) && ko - Date.now() > 1800000 && nbEnSac('clef-' + voulu) > 0 && (S.djClamp = S.djClamp || {}, (S.djClamp[voulu] = (S.djClamp[voulu] || 0) + 1) <= 3)) { B.djKO[voulu] = Date.now() + 1800000; sauveB(); note('Donjon choisi ' + nomDj(voulu) + ' : pause ramenée à 30 min (' + nbEnSac('clef-' + voulu) + ' clef(s) en sac)'); }
           }
           if (!nbEnSac('clef-' + voulu) && !(S.cleCoffreKO > Date.now())) { // V12.17 — ses clefs sont au coffre : j'en sors une
             const xk = (S.coffre || []).find((y) => y && y.itemId === 'clef-' + voulu);
@@ -7942,6 +7945,11 @@
             return;
           }
           if (c && c.pas && CFG.mode === 'quetes') { S.djQueteKO = { t: Date.now() + 20 * 60000 }; note('Donjon ' + nom + ' pour la quête : ' + c.pas + ' — je fais les autres quêtes 20 min'); return; } // V15.24 — pas de tour en rond pour un donjon bloqué
+          if (estDrarito() && c && c.pas && c.n > 0) { // V15.37 — Drarito : le donjon choisi et rien d'autre. Petite pause ou gardien momentanément injoignable : j'attends sur place, sans partir farmer
+            const ko2 = (B.djKO || {})[voulu] || 0, perdu2 = (B.djPerdu || {})[voulu] || 0;
+            if (c.npc && S.pnjIgnore[c.npc] > Date.now() + 60000) S.pnjIgnore[c.npc] = Date.now() + 60000;
+            if (!(perdu2 > S.niveau) && (ko2 - Date.now() <= 180000 || /injoignable/.test(c.pas))) { stop(); if (Number(CFG.soin) && S.hp < S.maxHp * 0.95 && await soigne()) return; statut('Donjon ' + nom + ' : ' + c.pas + ' — j’attends ici et j’y retourne (' + c.n + ' clefs)', true); return; }
+          }
           const assez = c && c.pas && c.n >= 3; // V12.17 — j'ai déjà ses clefs : farmer la clef ne sert à rien, je fais de l'XP en attendant
           if (assez) { if (S.djVouluDit !== c.pas) { S.djVouluDit = c.pas; note('Donjon choisi ' + nom + ' : ' + c.pas + ' — j’ai déjà ' + c.n + ' clefs, je fais de l’XP en attendant'); } }
           else if (c && c.pas) { if (S.djVouluDit !== c.pas) { S.djVouluDit = c.pas; note('Donjon choisi ' + nom + ' : ' + c.pas + ' — je farme sa clef en attendant'); } }
