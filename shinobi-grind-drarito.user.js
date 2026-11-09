@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.40.0
+// @version     15.41.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.40-Drarito';
+  const VERSION = 'V15.41-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -1414,6 +1414,7 @@
         try { tgDit('⚔️ Farm fixé dans la Plaine grise : groupes de 150 à 250 niveaux au total.'); } catch (e) {}
       }
       if (estDrarito() && CFG.drV17 !== 1) { CFG.drV17 = 1; CFG.nivGroupe = 150; sauve(); note('Drarito : groupes acceptés jusqu’à 150 niveaux au total (aucun ennemi à plus de 2 niveaux au-dessus de moi) — Réglages → Combat pour changer'); } // V14.75
+      if (estDrarito() && CFG.drV32 !== 1) { CFG.drV32 = 1; CFG.fmAchat = 1; if (CFG.mode !== 'forge') { CFG.modeAvant = CFG.mode; CFG.mode = 'forge'; } S.fmSessDebut = 0; sauve(); note('V15.41 : séance de Forgemagie optimale lancée — runes du sac et du coffre d’abord, puis achat à l’hôtel des ventes (au plus ' + (Number(CFG.fmBudget) || 60) + ' % de tes ryōs) ; ordre : Esprit, Puissance, Critique, Vitalité'); }
       if (estDrarito() && CFG.drV31 !== 1) { CFG.drV31 = 1; sauve(); const v = String(CFG.djChoisi || ''); if (v && (B.djKO || {})[v]) { delete B.djKO[v]; if (B.djPerdu) delete B.djPerdu[v]; sauveB(); note('Donjon ' + v + ' : la pause venait de faux refus (corrigés en V15.36) — je la lève et je l’enchaîne'); } } // V15.37
       if (estDrarito() && CFG.drV30 !== 1) { CFG.drV30 = 1; sauve(); const v = String(CFG.djChoisi || ''); if (v && ((B.djPerdu || {})[v] || (B.djKO || {})[v])) { if (B.djPerdu) delete B.djPerdu[v]; if (B.djKO) delete B.djKO[v]; sauveB(); note('Donjon ' + v + ' : pause après une défaite levée — je le reprends'); } } // V15.35
       if (estDrarito() && CFG.drV29 !== 1) { CFG.drV29 = 1; Object.assign(CFG, { nivGroupe: 950, nivGroupeMin: 710, nivGroupeAuto: { ref: Math.max(188, S.niveau || 188), cap: 950 } }); S.cibleId = null; sauve(); note('Drarito : groupes de 710 à 950 niveaux au total (tu viens de battre 5 Ombres des cendres facilement), et la borne monte avec ton niveau (baisse de 50 après une défaite contre un gros groupe) — Réglages → Combat pour changer'); } // V15.33
@@ -6086,25 +6087,75 @@
   const fmPrincipale = () => (S.voie === 'kenjutsu' || S.voie === 'taijutsu' ? 'physique' : 'esprit');
   const fmLignes = () => fmPrincipale() === 'physique'
     ? [['carac.physique', 'P'], ['fixe.physique', 'F'], ['carac.vitalite', 'V'], ['sec.puissance', 'W'], ['sec.critique', 'C']]
-    : [['carac.esprit', 'E'], ['carac.vitalite', 'V'], ['sec.critique', 'C'], ['sec.puissance', 'W'], ['fixe.esprit', 'G']]; // V15.36 — ordre d'après les poids du jeu (Esprit 1, Vitalité 0,25, Critique 5, Puissance 1,5, dommages fixes 6 par point) : l'Esprit rapporte le plus par point de Puits
+    : [['carac.esprit', 'E'], ['sec.puissance', 'W'], ['sec.critique', 'C'], ['carac.vitalite', 'V'], ['fixe.esprit', 'G']]; // V15.41 — ordre DPS : la Puissance s'ajoute à l'Esprit dans les dégâts (dé × (1 + (Esprit + Puissance)/100)), elle passe avant la Vitalité · V15.36 — ordre d'après les poids du jeu (Esprit 1, Vitalité 0,25, Critique 5, Puissance 1,5, dommages fixes 6 par point) : l'Esprit rapporte le plus par point de Puits
   // V15.36 — lignes qu'on ne pousse jamais au-delà du maximum avec le Puits : trop chères (dommages fixes : 12 points de Puits par point)
   const FM_SANS_SURCHARGE = new Set(['fixe.esprit', 'fixe.physique', 'sec.puissance']);
   const FM_TIERS = { 'carac.physique': [1, 2, 5, 10], 'carac.esprit': [1, 2, 5, 10], 'fixe.esprit': [1, 2], 'carac.vitalite': [1, 5, 10, 30], 'fixe.physique': [1, 2], 'sec.puissance': [1, 10, 20], 'sec.critique': [1] };
   const FM_FIN = { max: 'au plus haut', well: 'Puits vide', allowance: 'plus rien au-delà du catalogue', exotic_taken: 'déjà deux lignes exotiques' };
   const FM_SLOTS = ['weapon', 'head', 'chest', 'cape', 'hands', 'belt', 'feet', 'tool', 'neck', 'ring1', 'ring2'];
   const runeFm = (line, v) => { const [g, k] = line.split('.'); const b = 'rune-' + g + '-' + k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()); return v === FM_TIERS[line][0] ? b : b + '-' + v; };
-  const nbDans = (liste, id) => (liste || []).reduce((t, x) => t + (x && x.itemId === id ? x.quantity || 1 : 0), 0);
+  const nbDans = (liste, id) => (liste || []).reduce((t, x) => t + (x && x.itemId === id ? (x.quantity == null ? 1 : Math.max(0, Number(x.quantity) || 0)) : 0), 0);
   const fmActif = () => Number(CFG.fmAuto) === 1 && /^(kenjutsu|genjutsu|medical|taijutsu)$/.test(String(S.voie || ''));
   const FM_GARDE = new Set(); // runes que la forgemagie veut garder dans le sac (pas de retour au coffre)
   function fmTaches(slot, itemId) {
-    const cat = FM_CAT[itemId];
+    const cat = FM_CAT[itemId] != null ? FM_CAT[itemId] : (CFG.mode === 'forge' ? '' : null); // V15.41 — pièce hors catalogue : en séance, seulement les lignes exotiques (le jeu refuse ce qui n'est pas permis)
     if (cat == null) return null;
     const L5 = fmLignes(), ordre = String(CFG.points) === 'fersurvie' || INTU() ? L5.filter((x) => x[0] === 'carac.vitalite').concat(L5.filter((x) => x[0] !== 'carac.vitalite')) : L5; // survie : la Vitalité d'abord
-    const t = ordre.filter(([, l]) => cat.indexOf(l) >= 0).map(([line]) => ({ line, exo: false }));
-    const crit = Number((S.stats || {}).critique) || 0;
-    if (crit < 25 && cat.indexOf('C') < 0) t.push({ line: 'sec.critique', exo: true });
-    if (cat.indexOf('W') < 0) t.push({ line: 'sec.puissance', exo: true });
+    const crit = Number((S.stats || {}).critique) || 0, princ = L5[0][1];
+    // V15.41 — une seule liste dans l'ordre DPS : chaque ligne est native (au catalogue de la pièce) ou exotique (la caractéristique
+    // de la voie, le Critique sous 25 %, la Puissance) — une pièce sans Esprit (panoplie Puissance) reçoit l'Esprit en exotique avant la Vitalité
+    const t = [];
+    ordre.forEach(([line, l]) => { if (cat.indexOf(l) >= 0) t.push({ line, exo: false }); else if (l === princ || l === 'W' || (l === 'C' && crit < 25)) t.push({ line, exo: true }); });
     return t;
+  }
+  // V15.41 — achat de runes à l'hôtel des ventes pendant la séance de forgemagie : la ligne n'a plus aucune rune (sac et coffre).
+  // Toutes les tailles sont comparées au prix par point ; jamais plus de 2 × le prix médian, jamais une offre à moi,
+  // budget de la séance = CFG.fmBudget % des ryōs du début (60 % par défaut), et un plafond de points achetés par ligne.
+  const FM_ACHAT_MAX = { 'carac.esprit': 700, 'sec.puissance': 700, 'sec.critique': 40, 'carac.vitalite': 900, 'fixe.esprit': 0, 'carac.physique': 700, 'fixe.physique': 0 }; // dommages fixes : +1 par coup, presque rien face à l'Esprit — jamais achetés
+  const fmAchatMax = (line) => (FM_ACHAT_MAX[line] != null ? FM_ACHAT_MAX[line] : 300);
+  async function achatRunesFm(line) {
+    const now = Date.now();
+    if (!Number(CFG.fmAchat) || S.combat || !(S.ryo > 0)) return false;
+    S.fmAchatKO = S.fmAchatKO || {}; S.fmAchete = S.fmAchete || {};
+    if (S.fmAchatKO[line] > now) return false;
+    if (!fmAchatMax(line)) return false;
+    if ((S.fmAchete[line] || 0) >= fmAchatMax(line)) { S.fmAchatKO[line] = now + 6 * 3600000; note('Forgemagie : ' + line + ' — déjà ' + S.fmAchete[line] + ' points de runes achetés dans cette séance, je n’en achète plus'); return false; }
+    if (S.fmBudgetRest == null) S.fmBudgetRest = Math.floor(Math.max(5, Math.min(90, Number(CFG.fmBudget) || 60)) / 100 * S.ryo);
+    if (S.fmBudgetRest <= 0) { S.fmAchatKO[line] = now + 6 * 3600000; if (!S.vus.has('fmBudget')) { S.vus.add('fmBudget'); note('Forgemagie : budget d’achat de la séance épuisé — je forge avec ce qui reste'); } return false; }
+    if ((S.invCap || 60) - S.inv.filter((x) => x && x.itemId).length < 2) { S.fmAchatKO[line] = now + 600000; note('Forgemagie : sac plein, je ne peux pas acheter de runes'); return false; }
+    const offres = [];
+    for (const v of FM_TIERS[line] || []) {
+      const itemId = runeFm(line, v);
+      if (!envoie('market.browse', { itemId })) return false;
+      const r = await attend((ev, x) => ev === 'market.state' || (ev === 'server.error' && x.scope !== 'combat' && x.scope !== 'world'), 2500);
+      if (!r || r.ev === 'server.error') { S.fmAchatKO[line] = now + 1200000; note('Forgemagie : l’hôtel des ventes ne répond pas' + (r ? ' (' + (r.d.code || '?') + ')' : '') + ', je réessaierai dans 20 min'); return false; }
+      (Array.isArray(r.d.listings) ? r.d.listings : []).forEach((o) => { if (o && o.itemId === itemId && o.mine !== true && o.price > 0 && /^[0-9a-f-]{36}$/.test(String(o.id))) { const q = Math.max(1, Number(o.quantity) || 1); offres.push({ id: o.id, itemId, v, q, prix: o.price, pp: o.price / (v * q) }); } });
+      await dort(350);
+      if (S.combat) return false;
+    }
+    if (!offres.length) { S.fmAchatKO[line] = now + 3600000; note('Forgemagie : aucune rune ' + line + ' à vendre à l’hôtel des ventes pour l’instant (nouvel essai dans 1 h)'); return false; }
+    offres.sort((a, b) => a.pp - b.pp);
+    const med = offres[Math.min(offres.length - 1, Math.floor(offres.length / 2))].pp;
+    let n = 0, depense = 0, pts = 0; const det = {};
+    S.achatBot = true;
+    try {
+      for (const o of offres) {
+        if (n >= 8 || S.combat || o.pp > 2 * med || o.prix > S.fmBudgetRest || o.prix > S.ryo) continue;
+        if ((S.fmAchete[line] || 0) + pts >= fmAchatMax(line)) break;
+        const avant = S.ryo;
+        if (!envoie('market.buy', { listingId: o.id })) break;
+        const r = await attend((ev, x) => ev === 'market.result' || (ev === 'server.error' && x.scope !== 'combat' && x.scope !== 'world'), 2500);
+        await dort(450);
+        if (!r || r.ev === 'server.error' || (r.d && r.d.ok === false)) { if (!S.vus.has('fmAchatRefus')) { S.vus.add('fmAchatRefus'); note('Forgemagie : achat refusé à l’hôtel des ventes (' + (r ? (r.d.code || r.d.message || '?') : 'pas de réponse') + ')'); } continue; }
+        const paye = typeof S.ryo === 'number' && typeof avant === 'number' && S.ryo < avant ? avant - S.ryo : o.prix;
+        S.fmBudgetRest -= paye; depense += paye; pts += o.v * o.q; n++; det[o.itemId] = (det[o.itemId] || 0) + o.q;
+      }
+    } finally { S.achatBot = false; }
+    if (!n) { S.fmAchatKO[line] = now + 3600000; note('Forgemagie : runes ' + line + ' trop chères pour mon budget (reste ' + S.fmBudgetRest + ' ryōs, meilleure offre ' + offres[0].prix + ' pour ' + offres[0].q + ' × +' + offres[0].v + ')'); return false; }
+    S.fmAchete[line] = (S.fmAchete[line] || 0) + pts;
+    note('🛒 Forgemagie : acheté ' + Object.keys(det).map((k) => det[k] + ' × ' + k).join(', ') + ' pour ' + depense + ' ryōs (reste du budget de la séance : ' + S.fmBudgetRest + ', ryōs : ' + S.ryo + ')');
+    await dort(600);
+    return true;
   }
   async function forgemagie() {
     const sess = CFG.mode === 'forge'; // V15.36 — séance de forgemagie optimale (bouton) : rien d'autre tant que ce n'est pas fini
@@ -6130,6 +6181,7 @@
         let v = vMax != null && nbDans(S.inv, runeFm(tk.line, vMax)) > 0 ? vMax : null;
         if (v == null) {
           const auCoffre = vMax;
+          if (auCoffre == null && sess && await achatRunesFm(tk.line)) return true; // V15.41 — plus de rune nulle part : j'en achète à l'hôtel des ventes
           if (auCoffre == null) { F.fini[cle] = Date.now() + 6 * 3600000; if (!S.vus.has('fmSans:' + tk.line)) { S.vus.add('fmSans:' + tk.line); note('Forgemagie : plus aucune rune pour ' + tk.line + ' (sac et coffre) — brisez des pièces qui portent cette ligne'); } continue; }
           const id = runeFm(tk.line, auCoffre), q = Math.min(500, nbDans(S.coffre, id));
           FM_GARDE.add(id);
@@ -7889,7 +7941,7 @@
       }
       if (CFG.mode === 'forge') { // V15.36 — FORGEMAGIE OPTIMALE : sur place, sans combat, jusqu'à ce que tout soit forgé
         stop();
-        if (!S.fmSessDebut) { S.fmSessDebut = Date.now(); S.fmSessEssais = 0; S.fmSessGain = 0; S.fmSessFin = ''; const F0 = B.fm = B.fm || { fini: {}, jour: '', essais: 0 }; Object.keys(F0.fini || {}).forEach((k) => { if (F0.fini[k] - Date.now() < 7 * 3600000) delete F0.fini[k]; }); S.fmA = 0; S.vus.delete('fmFini'); note('Forgemagie optimale : je forge tout l’équipement porté (Esprit, Vitalité, Critique, Puissance, dommages fixes, puis le Puits pour pousser l’Esprit et la Vitalité au-delà du maximum)'); }
+        if (!S.fmSessDebut) { S.fmSessDebut = Date.now(); S.fmSessEssais = 0; S.fmSessGain = 0; S.fmSessFin = ''; S.fmBudgetRest = null; S.fmAchete = {}; S.fmAchatKO = {}; const F0 = B.fm = B.fm || { fini: {}, jour: '', essais: 0 }; Object.keys(F0.fini || {}).forEach((k) => { if (F0.fini[k] - Date.now() < 7 * 3600000) delete F0.fini[k]; }); S.fmA = 0; S.vus.delete('fmFini'); note('Forgemagie optimale : je forge tout l’équipement porté (Esprit, Vitalité, Critique, Puissance, dommages fixes, puis le Puits pour pousser l’Esprit et la Vitalité au-delà du maximum)'); }
         if (await forgemagie()) { statut('Forgemagie optimale · ' + (S.fmSessEssais || 0) + ' runes essayées · +' + (S.fmSessGain || 0) + ' points', true); return; }
         if (Date.now() < (S.fmA || 0) && !S.fmSessFin) { statut('Forgemagie optimale · j’attends la réponse du jeu', true); return; }
         const retour = CFG.modeAvant && CFG.modeAvant !== 'forge' ? CFG.modeAvant : 'xp';
@@ -9699,7 +9751,7 @@
       ['intuable', 'Intuable : 97 % de chances, PV hauts, soins tôt', OUI],
       ['coffreHoraire', 'Un coffre mystérieux par heure aussi en Farm / XP / Ryōs / Quêtes (sceau aller-retour)', OUI],
       ['coffreOuvre', 'Ouvrir moi-même les coffres mystérieux (sinon je vous y emmène et je m’arrête)', OUI],
-      ['fmAuto', 'Forgemagie automatique de l’équipement porté (caractéristique de la voie, Vitalité, Puissance, Critique)', OUI],
+      ['fmAuto', 'Forgemagie automatique de l’équipement porté (caractéristique de la voie, Vitalité, Puissance, Critique)', OUI], ['fmAchat', 'Forgemagie optimale : acheter les runes manquantes à l’hôtel des ventes', OUI],
       ['venteInutile', 'Vendre au marchand les matériaux sans recette et les petits soins (jamais de runes)', OUI],
       ['brisNiv', 'Briser l’équipement (sac et coffre) sous ce niveau (0 = jamais)'],
       ['brisInconnu', 'Brisage, pièce au niveau inconnu', { '': 'La garder', pire: 'La briser si elle est moins bonne que mon équipement' }],
@@ -9802,7 +9854,7 @@
     { const b = el('button', 'b large', CFG.mode === 'brisage' ? 'Arrêter le brisage' : '🔨 Briser maintenant'); b.onclick = () => { if (CFG.mode === 'brisage') { CFG.mode = CFG.modeAvant || 'xp'; note('Brisage arrêté'); } else lanceBrisage(); sauve(); affiche(); b.textContent = CFG.mode === 'brisage' ? 'Arrêter le brisage' : '🔨 Briser maintenant'; }; z.append(b); }
     blocReg(z, 'Caractéristiques', [['points', 'Plan de points']], 'Pour changer de plan : réinitialisez vos caractéristiques dans le jeu (gratuit), le bot replace tout seul les points.');
     { const b = el('button', 'b large', CFG.mode === 'forge' ? 'Arrêter la forgemagie' : '🔧 Forgemagie optimale maintenant'); b.onclick = () => { if (CFG.mode === 'forge') { CFG.mode = CFG.modeAvant || 'xp'; S.fmSessDebut = 0; note('Forgemagie optimale arrêtée'); } else { CFG.modeAvant = CFG.mode; CFG.mode = 'forge'; S.fmSessDebut = 0; S.cibleId = null; } sauve(); affiche(); }; z.append(b); }
-    blocReg(z, 'Forgemagie automatique', [['fmAuto', 'Forger l’équipement porté']], 'Esprit (Genjutsu, Médical) ou Physique (Kenjutsu), leurs dommages fixes, Vitalité, Puissance, Critique, puis Critique jusqu’à 25 % et Puissance en lignes exotiques. Runes prises dans le coffre, jamais vendues. 600 essais par jour au plus.');
+    blocReg(z, 'Forgemagie automatique', [['fmAuto', 'Forger l’équipement porté'], ['fmAchat', 'Séance optimale : acheter les runes qui manquent à l’hôtel des ventes (60 % des ryōs au plus)']], 'Esprit (Genjutsu, Médical) ou Physique (Kenjutsu), leurs dommages fixes, Vitalité, Puissance, Critique, puis Critique jusqu’à 25 % et Puissance en lignes exotiques. Runes prises dans le coffre, jamais vendues. 600 essais par jour au plus.');
     blocReg(z, 'Ventes', [['venteInutile', 'Vendre les matériaux sans recette et les petits soins'], ['venteRar', 'Vendre aussi l’équipement par couleur']], 'Jamais vendus : aucune rune, clefs, Baumes de l’Alliance, onguents Uzumaki, matériaux de recette.');
     return { el: z };
   }
