@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.38.0
+// @version     15.39.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.38-Drarito';
+  const VERSION = 'V15.39-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -4220,7 +4220,8 @@
       return;
     }
     const cd0 = S.cleDonnee;
-    if (cd0 && cd0.id === o.donjon && Date.now() - cd0.t < 45000) { stop(); statut('Donjon ' + o.donjon + ' : clef donnée, j’attends l’entrée (' + Math.round((45000 - (Date.now() - cd0.t)) / 1000) + ' s)', true); return; }
+    const enGroupe = (S.groupeN || 0) >= 2, delai = enGroupe ? 600000 : 45000; // V15.39 — en groupe, le donjon ne part que quand CHAQUE membre a parlé au gardien : j'attends jusqu'à 10 min, sans reprendre ma clef (le bouton « Donner ma clef / reprendre » est un interrupteur)
+    if (cd0 && cd0.id === o.donjon && Date.now() - cd0.t < delai) { stop(); const autres = (S.groupeMembres || []).filter((x) => !(S.self && x.id === S.self.id)).map((x) => x.nom).join(', '); statut('Donjon ' + o.donjon + ' : clef donnée, ' + (enGroupe ? 'j’attends que ' + (autres || 'le groupe') + ' parle au gardien' : 'j’attends l’entrée') + ' (' + Math.round((delai - (Date.now() - cd0.t)) / 1000) + ' s)', true); if (enGroupe && S.groupeAttDit !== cd0.t) { S.groupeAttDit = cd0.t; note('Donjon ' + nomDj(o.donjon) + ' : ma clef est donnée — le donjon partira quand ' + (autres || 'les autres membres du groupe') + ' aura parlé au gardien et accepté'); } return; }
     if (cd0 && cd0.id === o.donjon && enMonde()) { // 45 s après avoir donné la clef, toujours dehors : là, c'est un vrai refus
       S.cleDonnee = null;
       S.djRefus = S.djRefus || {}; S.djRefus[o.donjon] = (S.djRefus[o.donjon] || 0) + 1;
@@ -7874,6 +7875,11 @@
       // et je rejoins chaque combat que lance un membre de mon groupe (fenêtre « Combat de groupe », d'où que je sois dans la zone).
       if (CFG.mode === 'groupe') {
         if (Number(CFG.soin) && S.maxHp > 0 && S.hp < 0.95 * S.maxHp && await soigne()) return;
+        if (enMonde() && S.pos) { // V15.39 — AFK groupe : à côté d'un gardien de donjon dont j'ai la clef, je donne la mienne une fois (le donjon de groupe part quand chacun a accepté)
+          const e = entreesDj().find((y) => y && y.npcId && (!y.w || y.w === S.mapId) && dist(y, S.pos) < 220 && nbEnSac('clef-' + (y.dungeonId || y.id)) > 0);
+          const dj = e && (e.dungeonId || e.id), cdg = S.cleDonnee;
+          if (e && !(cdg && cdg.id === dj && Date.now() - cdg.t < 600000) && !(S.grpCleA > Date.now())) { S.grpCleA = Date.now() + 120000; note('AFK groupe : je suis devant ' + nomDj(dj) + ' — je donne ma clef au gardien pour suivre le groupe'); await entreDonjon({ type: 'talk', npc: e.npcId, label: 'entrer dans le donjon ' + dj, donjon: dj }); return; }
+        }
         if (suisGroupe()) return; // V14.89 — je suis le joueur choisi de mon groupe sur la carte
         stop();
         statut('AFK groupe : j’attends un combat d’un allié' + (S.allieJoin ? ' · ' + S.allieJoin.nom + ' se bat' : ''), true);
