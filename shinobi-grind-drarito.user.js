@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.37.0
+// @version     15.38.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.37-Drarito';
+  const VERSION = 'V15.38-Drarito';
   const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -5158,6 +5158,26 @@
         return { type: 'skill', skillId: coup.premier.id, target: { x: coup.e.x, y: coup.e.y }, los: coup.premier.los && man(moi, coup.e) > 1 ? (aligne(moi, coup.e) ? 'a' : 'd') : '' };
       }
     }
+    { // V15.38 — ENRIGAN DU SOUVERAIN : Décret au premier tour utile sur le plus gros paquet, Regard dominateur (−3 PA) chaque tour sur l'ennemi le plus dangereux, Sceau impérial sur un paquet
+      const fiche = (suf) => { for (const [id, t] of S.techniques) if (/^enrigan\.souverain\./.test(id) && id.endsWith('.' + suf)) return { id, t }; return null; };
+      const pret = (o) => !!o && !c.interdits.has(o.id) && moi.ap - reserve >= (o.t.apCost || 0) && (moi.chakra == null || moi.chakra >= (o.t.chakraCost || 0)) && !(cd[o.id] > 0) && !(S.cd[o.id] > 0) && (casts[o.id] || 0) < (o.t.castsPerTurn || 99) && !((c.unique || {})[o.id]) && (!Array.isArray(S.bar) || !S.bar.length || S.bar.indexOf(o.id) >= 0);
+      const dptE = (e) => { const esp = B.especes[e.mobId || e.name]; return esp && esp.dpt != null && esp.n > 0 ? Math.max(esp.dptMax || 0, esp.dpt || 0) : 0.12 * (moi.maxHp || moi.hp || 1); };
+      const rangE = (e) => String(e.rank || e.category || (e.monsterV5 || {}).category || '');
+      const danger = (e) => dptE(e) * (/boss/i.test(rangE(e)) ? 2 : /elite/i.test(rangE(e)) ? 1.5 : 1);
+      const vivants = ennemis.filter((e) => e.hp > 0);
+      const pvTot = vivants.reduce((t, e) => t + e.hp, 0), monTour = Math.max(1, (B.degMoy || 20) * 2.6);
+      const portee = (o, q) => { const d = man(moi, q); return d >= (o.t.minRange || 0) && d <= (o.t.maxRange || 1) && (!o.t.lineOfSight || d <= 1 || vueDe(moi, q)); };
+      const rayon = (o) => { const ar = String(o.t.area || ''); return /square5|circle2/.test(ar) ? 2 : /square3|circle1|cross/.test(ar) ? 1 : 0; };
+      const meilleureCase = (o) => { const r = rayon(o), R = o.t.maxRange || 1; let best = null; for (let x = moi.x - R; x <= moi.x + R; x++) for (let y = moi.y - R; y <= moi.y + R; y++) { const q = { x, y }; if (!portee(o, q)) continue; const tou = vivants.filter((e) => Math.max(Math.abs(e.x - x), Math.abs(e.y - y)) <= r); if (!tou.length) continue; const v = tou.reduce((t, e) => t + danger(e), 0); if (!best || tou.length > best.n || (tou.length === best.n && v > best.v)) best = { q, n: tou.length, v, tou }; } return best; };
+      if (pvTot > monTour * 1.2) { // le combat ne se termine pas ce tour-ci : le contrôle vaut la peine
+        const dec = fiche('decret-du-souverain');
+        if (pret(dec)) { const b = meilleureCase(dec); if (b && (b.n >= 3 || (b.n >= 2 && b.tou.some((e) => /boss|elite/i.test(rangE(e)))))) { c.unique = c.unique || {}; c.unique[dec.id] = 1; note('Tactique : Décret du Souverain sur ' + b.n + ' ennemis (dégâts d’Esprit, affaiblis 2 tours, −1 PA)'); return { type: 'skill', skillId: dec.id, target: b.q, tactique: true }; } }
+        const reg = fiche('regard-dominateur');
+        if (pret(reg)) { const e = vivants.filter((x) => portee(reg, x)).sort((a2, b2) => danger(b2) - danger(a2))[0]; if (e && e.hp > monTour * 0.5) { if (c.ditRegard !== c.mesTours) { c.ditRegard = c.mesTours; note('Tactique : Regard dominateur sur ' + (e.name || 'l’ennemi') + ' (−3 PA)'); } return { type: 'skill', skillId: reg.id, target: { x: e.x, y: e.y }, los: reg.t.lineOfSight && man(moi, e) > 1 ? (aligne(moi, e) ? 'a' : 'd') : '' }; } }
+        const sce = fiche('sceau-imperial');
+        if (pret(sce)) { const b = meilleureCase(sce); if (b && ((b.n >= 2 && !c.facile) || b.tou.some((e) => /boss|elite/i.test(rangE(e))))) { note('Tactique : Sceau impérial sur ' + b.n + ' ennemi(s) (affaiblis 2 tours, −1 PA)'); return { type: 'skill', skillId: sce.id, target: b.q, tactique: true }; } }
+      }
+    }
     // V11.26 — PORTÉE : rien ne porte d'ici, mais avec le renfort de PO (Fils tendus) un tir passerait : je le lance plutôt que de marcher
     // vers l'ennemi (je garde mes distances et mes PM). Aussi quand l'ennemi le plus proche est juste au-delà de ma portée.
     const boostPo = (A.boosts || []).filter((b) => b.po > 0 && b.surSoi && !c.interdits.has(b.id)).sort((a, b) => a.pa - b.pa)[0];
@@ -6513,8 +6533,10 @@
   Object.assign(VAL_UTIL, { 'coeur-de-bois-v3.cuirasse-de-bois': 85, 'coeur-de-bois-v3.reparation': 80, 'coeur-de-bois-v3.fil-de-vie': 75, 'coeur-de-bois-v3.ordre-armure-de-fer': 60, 'coeur-de-bois-v3.rembourrage': 55, 'coeur-de-bois-v3.bris-volontaire': 50, 'coeur-de-bois-v3.fils-d-entrave': 45, 'coeur-de-bois-v3.ordre-sacrifice': 40, 'coeur-de-bois-v3.ressort-cache': 25, 'coeur-de-bois-v3.fil-d-echange': 20 });
   const teste = (id) => { const d = (B.degSort || {})[id] || {}, b = (B.buffs || {})[id] || {}; return (d.n || 0) >= 5 || (d.ns || 0) >= 3 || (b.n || 0) >= 3 || (b.nd || 0) >= 3 || ((B.invTest || {})[id] || 0) >= 2 || ((B.lances || {})[id] || 0) >= 4 || !!(B.testKO || {})[id]; };
   Object.assign(VAL_UTIL, { 'chirurgien-v3.egide': 120, 'chirurgien-v3.renaissance': 110, 'chirurgien-v3.point-de-suture': 100, 'chirurgien-v3.pilule-du-soldat': 95, 'chirurgien-v3.barriere': 80, 'chirurgien-v3.point-de-pression': 45, 'chirurgien-v3.vague-de-reflux': 15 }); // V12.31 — Chirurgien : survie pour les boss
+  const VAL_SOUV = { 'enrigan.souverain.regard-dominateur': 400, 'enrigan.souverain.decret-du-souverain': 380, 'enrigan.souverain.sceau-imperial': 300 }; // V15.38 — Enrigan du Souverain : toujours dans la barre
   function valeurBarre(id) {
     if (!id) return -1;
+    if (VAL_SOUV[id] != null) return VAL_SOUV[id];
     if (physique(id)) return 0;
     if (/^chirurgien-/.test(id) && VAL_UTIL[id] != null) return VAL_UTIL[id];
     { const t3 = S.techniques.get(id); if (t3 && !(t3.effects || []).some((x) => x.kind === 'damage' && (x.max || 0) > 0)) { // V12.25 — utilitaires jugés sur ce qu'ils apportent
@@ -6549,13 +6571,13 @@
     if (!Number(CFG.barre) || !Array.isArray(S.bar) || !S.bar.length || S.barreKO > Date.now() || S.combat) return false;
     // V14.84 — seulement de vraies techniques connues du jeu : les noms d'héritage (« nara.ombre-etendue ») ne sont pas des techniques,
     // le jeu refusait toute la barre (« unknown_jutsu ») depuis des jours et elle restait figée.
-    const apprises = [...new Set([...S.techniques.keys()].concat(S.herSkills || []))].filter((id) => S.techniques.has(id) && !/^weapon\./.test(id) && (!S.mesSkills || S.mesSkills.indexOf(id) >= 0 || (S.herSkills || []).indexOf(id) >= 0 || /^heritage\./.test(id)));
+    const apprises = [...new Set([...S.techniques.keys()].concat(S.herSkills || []))].filter((id) => S.techniques.has(id) && !/^weapon\./.test(id) && (!S.mesSkills || S.mesSkills.indexOf(id) >= 0 || (S.herSkills || []).indexOf(id) >= 0 || /^heritage\./.test(id) || /^enrigan\.souverain\./.test(id))); // V15.38 — l'Enrigan du Souverain obtenu
     const sig = S.bar.join(',') + '|' + apprises.join(',') + '|g' + ((S.groupeN || 0) >= 2 || CFG.mode === 'boss' ? 1 : 0) + /* V14.37 : la barre se refait quand je rejoins un groupe (Accélération) */ (Number(CFG.testTout) ? '|' + apprises.filter(teste).length + '|' + Math.floor(Date.now() / 600000) : '');
     if (S.barFaite === sig) return false;
     S.barFaite = sig;
     const neuf = S.bar.slice(); while (neuf.length < 16) neuf.push(null);
     const H = (i) => i >= 12; // cases d'héritage
-    const estH = (id) => /^heritage\./.test(id) || (S.herSkills || []).indexOf(id) >= 0 || /^(inuzuka|nara|uchiha|hyuga|senju|akimichi|yamanaka|aburame|uzumaki|mokuton)\./.test(id);
+    const estH = (id) => /^heritage\./.test(id) || (S.herSkills || []).indexOf(id) >= 0 || /^(inuzuka|nara|uchiha|hyuga|senju|akimichi|yamanaka|aburame|uzumaki|mokuton)\./.test(id) || (/^(enrigan|kekkei)\./.test(id) && !!(B.enrH || {})[id]); // V15.38 — un pouvoir d'Enrigan va en case H seulement si le jeu l'a refusé ailleurs
     const posees = [], retirees = [];
     for (let k = 0; k < neuf.length; k++) if (neuf[k] && physique(neuf[k])) { retirees.push(neuf[k]); neuf[k] = null; } // V12.20
     // V12.24 — TOUR DE TEST : les techniques apprises jamais essayées entrent à tour de rôle à la place de celles déjà mesurées
@@ -6593,6 +6615,7 @@
     }
     if (!envoie('character.bar', { slots: neuf })) return false;
     const r = await attend((ev, x) => (ev === 'server.error' && x.scope !== 'combat') || ev === 'character.state' || ev === 'character.techniques', 2000);
+    if (r && r.ev === 'server.error' && /slot/.test(String(r.d.code || '')) && posees.some((id) => /^(enrigan|kekkei)\./.test(id) && !(B.enrH || {})[id])) { B.enrH = B.enrH || {}; posees.filter((id) => /^(enrigan|kekkei)\./.test(id)).forEach((id) => { B.enrH[id] = 1; }); sauveB(); S.barFaite = null; S.barDerT = 0; note('Barre : les pouvoirs d’Enrigan vont dans les cases H — je réessaie'); return true; } // V15.38
     if (r && r.ev === 'server.error') { S.barreKO = Date.now() + 3600000; note('Barre de techniques : changement refusé (' + (r.d.code || '?') + '), je réessaierai dans 1 h · voulue : ' + neuf.map((x) => x || '—').join(', ')); return true; }
     S.bar = neuf; S.barFaite = null; sauveB();
     note('Barre de techniques mise à jour' + (posees.length ? ' · ajoutées : ' + posees.join(', ') : '') + (retirees.length ? ' · retirées : ' + retirees.join(', ') : ''));
