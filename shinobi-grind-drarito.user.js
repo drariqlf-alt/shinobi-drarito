@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.42.0
+// @version     15.43.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,8 +114,8 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.42-Drarito';
-  const CFG = { eveilFin: 210, eveilFaille: 'cauchemar', inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
+  const VERSION = 'V15.43-Drarito';
+  const CFG = { pvpFile: '1v1', eveilFin: 210, eveilFaille: 'cauchemar', inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
   Object.assign(CFG, { explore: 1, filtre: '', nivMax: 0, pvMin: 85 }); // 85 % de PV au moins pour lancer un combat : fixe, sans réglage
@@ -671,6 +671,10 @@
     'combat.join': (c) => ({ combatId: String(c.combatId).slice(0, 64) }), // V14.90 — le bouton « Rejoindre » du combat de groupe
     'instance.switch': (c) => ({ instanceId: String(c.instanceId).slice(0, 64) }), // V14.90 — le choix d'instance du jeu (pour être dans la même que mon chef)
     'party.locate': () => ({}),
+    'arena.read': () => ({}), // V15.43 — ARÈNE DES KAGE (formes exactes du jeu)
+    'arena.queue.join': (c) => { if (!/^(1v1|2v2|3v3|4v4)$/.test(String(c && c.mode))) throw new Error('file'); return { mode: c.mode }; },
+    'arena.queue.leave': () => ({}),
+    'arena.match.answer': (c) => { if (!/^[0-9a-f-]{36}$/.test(String(c && c.matchId))) throw new Error('match'); return { matchId: c.matchId, accept: c.accept === true }; },
     'eveil.read': () => ({}), // V15.42 — TOUR DE L'ÉVEIL (formes exactes du jeu)
     'eveil.enter': () => ({}),
     'eveil.wake': () => ({}),
@@ -1263,6 +1267,102 @@
     } catch (e) {}
   }
   // V15.42 — TOUR DE L'ÉVEIL : état de la Tour (dehors / vestibule / étage, failles) et résultat de chaque faille.
+  // V15.43 — ARÈNE : état de la file, match trouvé (accepté tout de suite en mode PvP), résultat.
+  function lisArene(ev, d) {
+    if (!d || typeof d !== 'object') return;
+    if (ev === 'arena.state') { S.arene = d; S.areneT = Date.now(); if (!S.vus.has('areneFmt')) { S.vus.add('areneFmt'); retiens('arena.state', JSON.stringify(Object.assign({}, d, { shop: undefined, history: undefined, pastSeasons: undefined })).slice(0, 600)); } }
+    else if (ev === 'arena.match.found') {
+      S.areneMatch = d;
+      if (CFG.mode === 'pvp' && d.matchId && !(d.accepted || []).some((x) => S.self && x === S.self.id)) {
+        envoie('arena.match.answer', { matchId: d.matchId, accept: true });
+        const adv = ((d.teams || [])[d.side === 0 ? 1 : 0] || []).map((x) => x.name + ' (niv. ' + x.level + ', ' + x.rating + ')').join(', ');
+        note('⚔️ Arène : match trouvé contre ' + (adv || '?') + ' — accepté'); try { tgAlerte('⚔️ Arène : match contre ' + (adv || '?')); } catch (e) {}
+      }
+    } else if (ev === 'arena.match.cancelled') { S.areneMatch = null; S.areneA = Date.now() + 3000; note('Arène : match annulé (' + (d.reason || '?') + ')' + (d.requeued ? ', je reste dans la file' : '')); }
+    else if (ev === 'arena.result') {
+      S.areneMatch = null; S.areneA = Date.now() + 4000;
+      const A = S.areneStats = S.areneStats || { v: 0, d: 0 };
+      const won = d.won === true;
+      if (won) A.v++; else A.d++;
+      const cote = (d.rating != null ? ' · cote ' + d.rating + (d.delta != null ? ' (' + (d.delta >= 0 ? '+' : '') + d.delta + ')' : '') : '') + (d.league ? ' · ligue ' + d.league : '');
+      note('🏆 Arène : ' + (won ? 'victoire' : d.neutral ? 'match nul' : 'défaite') + (d.deserted ? ' (désertion)' : '') + cote + ' · ' + A.v + ' V / ' + A.d + ' D cette session');
+      try { tgAlerte('🏆 Arène : ' + (won ? 'victoire' : 'défaite') + cote + ' (' + A.v + ' V / ' + A.d + ' D)'); } catch (e) {}
+    }
+  }
+  // MODE PvP : je m'inscris à la file de l'Arène (1v1 par défaut), j'accepte chaque match et je me bats avec la tactique PvP
+  // (fiches des sorts adverses, portées, boucliers, Susanoo). Rien d'autre : ni farm, ni ventes, ni déplacements.
+  async function modePvp() {
+    const now = Date.now(); stop();
+    chargePvpDb();
+    if (now < (S.areneA || 0)) return;
+    const A = S.arene;
+    if (!A || now - (S.areneT || 0) > 20000) { S.areneA = now + 4000; envoie('arena.read', {}); statut('⚔️ PvP : je lis l’état de l’Arène…', true); return; }
+    if (A.enabled === false) { statut('⚔️ PvP : l’Arène est fermée pour l’instant', true); S.areneA = now + 60000; S.areneT = 0; return; }
+    if (A.lockedUntil && A.lockedUntil > now) { statut('⚔️ PvP : file fermée jusqu’à ' + new Date(A.lockedUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), true); S.areneA = now + 30000; S.areneT = 0; return; }
+    if (S.areneMatch) { statut('⚔️ PvP : match trouvé, j’attends la salle', true); return; }
+    if (A.queue) { const St = S.areneStats || { v: 0, d: 0 }; statut('⚔️ PvP : dans la file ' + A.queue.mode + ' depuis ' + Math.round((now - (Number(A.queue.since) > 1e12 ? A.queue.since : A.queue.since * 1000)) / 60000) + ' min · ' + St.v + ' V / ' + St.d + ' D', true); S.areneA = now + 15000; S.areneT = 0; return; }
+    const file = /^(1v1|2v2|3v3|4v4)$/.test(String(CFG.pvpFile)) ? CFG.pvpFile : '1v1';
+    S.areneA = now + 5000; S.areneT = 0;
+    envoie('arena.queue.join', { mode: file });
+    note('⚔️ PvP : inscription à la file ' + file + ' de l’Arène');
+  }
+  // V15.43 — FICHES DES SORTS DE TOUS LES JOUEURS, lues dans le jeu lui-même : le Livre des sorts du wiki (valeurs en vigueur :
+  // PA, recharge, portée, ligne de vue, dégâts, bouclier, riposte, parade…) et les noms des techniques dans les fichiers du jeu
+  // (identifiant → nom). Gardées 24 h. Sert à savoir ce qu'un adversaire peut me faire au prochain tour, et de combien de cases.
+  let PVPDB = null, pvpDbEnCours = false;
+  const normNom = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+  function lisLivreSorts(tx) {
+    const re = /([^\s—][^—]{0,40}?) — déblocage et talents(.+?) · niveau (\d+) · (\d+) PA · recharge (\d+) tour\(s\)(.*?)Retrouver dans le livre des sorts/g, out = {};
+    let m;
+    while ((m = re.exec(tx))) {
+      const b = m[6], n = (r) => { const x = b.match(r); return x ? Number(x[1]) : 0; };
+      const po = b.match(/Portée (\d+)\s*[–-]\s*(\d+)/), cible = (b.match(/Cible : ([^·]+?)\s*·/) || [])[1] || '';
+      let dg = 0; for (const x of b.matchAll(/Dégâts (\d+)\s*[–-]\s*(\d+)/g)) dg += (Number(x[1]) + Number(x[2])) / 2;
+      const par = /Deux par tour|2 lancers? par tour/.test(b) ? 2 : /Trois par tour|3 lancers? par tour/.test(b) ? 3 : 1;
+      out[normNom(m[2])] = { g: m[1].trim(), nom: m[2].trim(), niv: Number(m[3]), pa: Number(m[4]), cd: Number(m[5]), min: po ? Number(po[1]) : 0, max: po ? Number(po[2]) : 0,
+        los: !/sans ligne de vue/.test(b), cible: cible.trim(), dg, par, upf: n(/(\d+) utilisation\(s\) par combat/), bouclier: n(/Bouclier de (\d+) %/), pare: n(/pare (\d+) %/),
+        riposte: /riposte \d/.test(b), reduitPo: n(/Réduit la portée de (\d+)/), mobile: !dg && /t[ée]l[ée]port|bond|saute|r[ée]appara|ruée|charge|fonce/i.test(b) && /case|soi/.test(cible) };
+    }
+    return out;
+  }
+  async function chargePvpDb(force) {
+    if ((PVPDB && !force) || pvpDbEnCours || Date.now() < (S.pvpDbA || 0)) return;
+    try { const j = JSON.parse(localStorage.getItem('__sg_pvpdb') || 'null'); if (!force && j && j.v === 1 && Date.now() - j.t < 86400000 && Object.keys(j.sorts || {}).length > 100) { PVPDB = j; return; } } catch (e) {}
+    pvpDbEnCours = true;
+    try {
+      const h = await (await fetch('/wiki/sorts', { cache: 'no-cache' })).text();
+      const doc = new DOMParser().parseFromString(h, 'text/html'); const main = doc.querySelector('main') || doc.body;
+      const sorts = lisLivreSorts(main ? main.textContent : '');
+      const slugs = {}, urls = new Set();
+      performance.getEntriesByType('resource').forEach((e) => { if (/\.js(\?|$)/.test(e.name) && e.name.indexOf(location.origin) === 0) urls.add(e.name); });
+      document.querySelectorAll('script[src]').forEach((x) => { if (x.src.indexOf(location.origin) === 0) urls.add(x.src); });
+      for (const u of urls) {
+        const t = await (await fetch(u, { cache: 'force-cache' })).text();
+        for (const x of t.matchAll(/(?:id|slug):"([a-z0-9][a-z0-9.-]{1,80})",name:"([^"]{2,60})"/g)) { const sl = x[1].split('.').pop(), k = normNom(x[2]); if (sorts[k] && !slugs[sl]) slugs[sl] = k; }
+      }
+      if (Object.keys(sorts).length < 100) { S.pvpDbA = Date.now() + 600000; note('PvP : le Livre des sorts n’a rendu que ' + Object.keys(sorts).length + ' techniques — nouvel essai dans 10 min'); pvpDbEnCours = false; return; }
+      PVPDB = { v: 1, t: Date.now(), sorts, slugs };
+      try { localStorage.setItem('__sg_pvpdb', JSON.stringify(PVPDB)); } catch (e) {}
+      note('PvP : fiches de ' + Object.keys(sorts).length + ' techniques chargées (' + Object.keys(slugs).length + ' reliées à leur identifiant)');
+    } catch (e) { S.pvpDbA = Date.now() + 600000; note('PvP : lecture du Livre des sorts impossible (' + e.message + '), nouvel essai dans 10 min'); }
+    pvpDbEnCours = false;
+  }
+  const ficheSort = (id) => { if (!PVPDB || !id) return null; const k = PVPDB.slugs[String(id).split('.').pop()]; return k ? PVPDB.sorts[k] : null; };
+  // Ce qu'un joueur adverse peut me faire au prochain tour : ses techniques prêtes (recharge finie ou finie au prochain tour), dans ses PA max.
+  function menaceJoueur(e) {
+    const ids = Array.isArray(e.skills) ? e.skills : [], cds = e.cooldowns || {}, ap = Math.max(1, e.maxAp || e.ap || 6);
+    let po = 0, mob = 0, poMoins = 0; const offs = [];
+    (e.effects || []).forEach((x) => { if (x && x.kind === 'buff' && /range|port/i.test(String(x.name)) && x.amount > 0) po += x.amount; if (x && /range|port/i.test(String(x.name)) && x.amount < 0) poMoins += -x.amount; });
+    ids.forEach((id) => { const f = ficheSort(id); if (!f || (cds[id] || 0) > 1) return; if (f.dg > 0 && f.max > 0) offs.push(f); if (f.mobile) mob = Math.max(mob, f.max); });
+    if (!offs.length) return null;
+    const porteeMax = Math.max(...offs.map((f) => f.max)) + po - poMoins;
+    // les meilleurs dés par PA dans ses PA (gourmand), chaque sort au plus « par tour » fois, un seul si recharge
+    let reste = ap, des = 0;
+    offs.slice().sort((a, b) => b.dg / Math.max(1, b.pa) - a.dg / Math.max(1, a.pa)).forEach((f) => { const n = Math.min(f.cd > 0 ? 1 : f.par, Math.floor(reste / Math.max(1, f.pa))); if (n > 0) { reste -= n * f.pa; des += n * f.dg; } });
+    return { portee: Math.max(1, porteeMax), mob, des, ids: offs.length };
+  }
+  // PV à traverser pour tuer : la vie, plus le bouclier (Susanoo, Parade de fer…), et la parade de l'avatar sur les premiers coups.
+  const pvE = (e) => { if (!e) return 0; const sh = Math.max(0, Number(e.shield) || 0); const f = String((e.avatar && e.avatar.form) || ''); const pare = /susanoo-complete/.test(f) ? 1.12 : /susanoo-partial/.test(f) ? 1.05 : 1; return Math.max(0, e.hp || 0) * pare + sh; };
   function lisEveil(ev, d) {
     if (!d || typeof d !== 'object') return;
     if (ev === 'eveil.state') { if (S.eveilEnVol > 0) S.eveilEnVol--; if (S.eveilJeter > 0) { S.eveilJeter--; return; } /* réponse à une lecture partie avant ma dernière action : périmée (le jeu répond dans l'ordre) */ S.eveil = d; S.eveilT = S.eveilVuT = Date.now(); if (!S.vus.has('eveilFmt')) { S.vus.add('eveilFmt'); retiens('eveil.state', JSON.stringify(Object.assign({}, d, { shop: undefined })).slice(0, 600)); } }
@@ -1277,6 +1377,7 @@
   function traite(ev, d) {
     lisFestival(ev, d);
     if (/^eveil\./.test(ev)) lisEveil(ev, d);
+    if (/^arena\./.test(ev)) lisArene(ev, d);
     if (d && typeof d === 'object' && /inventory|item|forge|craft|equip|gear|rune|panopl|set\.|vault|stuff/i.test(ev)) { try { S.brutEq = S.brutEq || {}; const j = JSON.stringify(d); if (j.length < 600000) S.brutEq[ev] = j; } catch (e) {} }
     if (d && typeof d === 'object' && /inventory|item|forge|craft|market|shop|vault|bank|coffre|chest|equip|gear|loot|reward/i.test(ev)) { try { apprendNiveaux(d, 0); } catch (e) {} }
     // Groupe et combats d'alliés : j'apprends la forme exacte de ce que le jeu envoie (invitation, membres, combat à rejoindre) avant d'écrire l'option.
@@ -4769,7 +4870,7 @@
     return true;
   }
   const fige = (e) => { const c = S.combat, f = c && c.figes && c.figes.get(e.id); return !!(f && c.mesTours < f.fin); };
-  const profil = (e) => { if (e.kind === 'player' || e.playerId) { const J = (B.joueurs || {})[e.name] || {}; return { pm: fige(e) ? 0 : Math.max(4, J.pm || 0), portee: Math.max(5, J.portee || 0), poids: Math.max(10, 0.25 * (S.maxHp || 100), J.dptMax ? 0.8 * J.dptMax : 0) }; } const esp = B.especes[e.mobId || e.name] || {}; const cb = S.combat, rl = cb && cb.ral && cb.ral[e.id], moins = rl && rl.t === cb.mesTours ? rl.n : 0; return { pm: fige(e) ? 0 : Math.max(0, (esp.pm != null ? esp.pm : 3) - moins), portee: esp.portee || 1, poids: Math.max(1, esp.dptMax || esp.dpt || 1) }; };
+  const profil = (e) => { if (e.kind === 'player' || e.playerId) { const J = (B.joueurs || {})[e.name] || {}; const M = menaceJoueur(e); if (M) { const k = B.pvpK > 0 ? B.pvpK : 9; return { pm: fige(e) ? 0 : Math.max(e.maxMp || e.mp || 3, J.pm || 0) + M.mob, portee: M.portee, poids: Math.max(10, J.dptMax ? 0.8 * J.dptMax : 0, M.des * k) }; } return { pm: fige(e) ? 0 : Math.max(4, J.pm || 0), portee: Math.max(5, J.portee || 0), poids: Math.max(10, 0.25 * (S.maxHp || 100), J.dptMax ? 0.8 * J.dptMax : 0) }; } /* V15.43 — un joueur : ses vraies techniques prêtes (portée max + bonus de portée, bonds, PM, dégâts estimés) */ const esp = B.especes[e.mobId || e.name] || {}; const cb = S.combat, rl = cb && cb.ral && cb.ral[e.id], moins = rl && rl.t === cb.mesTours ? rl.n : 0; return { pm: fige(e) ? 0 : Math.max(0, (esp.pm != null ? esp.pm : 3) - moins), portee: esp.portee || 1, poids: Math.max(1, esp.dptMax || esp.dpt || 1) }; };
   // Ce que je risque de prendre au prochain tour adverse si je finis le mien sur « cell » :
   // chaque ennemi compte s'il peut venir jusqu'à une case d'où il me touche (portée et ligne de vue apprises en combat).
   function menace(c, moi, cell, ennemis) {
@@ -5047,10 +5148,11 @@
     // UNE CIBLE À LA FOIS. Dès le premier tour je choisis l'ennemi le plus vite tué (le moins de PV ; à égalité le plus dangereux, puis le plus proche)
     // et je ne le lâche plus jusqu'à sa mort. Je ne tire sur un autre que si celui-là est hors d'atteinte ce tour-ci, ou si un autre peut être achevé.
     const joueursE = ennemis.filter(estJoueur), pvp = joueursE.length > 0;
+    if (pvp && !PVPDB) chargePvpDb(); // V15.43 — fiches des sorts adverses (une fois, gardées 24 h)
     // V12.2 — En duel, la cible est le JOUEUR. Ses invocations (Ninken, clones…) reviennent dès qu'il les rappelle : les tuer coûte des coups pour rien.
     if (pvp && c.focus && !joueursE.some((e) => e.id === c.focus)) c.focus = null;
     if (!c.focus || !ennemis.some((e) => e.id === c.focus)) {
-      const f = (pvp ? joueursE : ennemis).slice().sort((a, b) => (a.hp - b.hp) || (profil(b).poids - profil(a).poids) || (man(moi, a) - man(moi, b)))[0];
+      const f = (pvp ? joueursE : ennemis).slice().sort((a, b) => (pvE(a) - pvE(b)) || (profil(b).poids - profil(a).poids) || (man(moi, a) - man(moi, b)))[0];
       c.focus = f.id;
       if (ennemis.length > 1) note('Tactique : cible ' + (f.name || f.mobId || 'ennemi') + ' (' + f.hp + ' PV, le plus vite tué) — je ne la lâche pas');
     }
@@ -5138,7 +5240,7 @@
       let top = { v: 0, premier: null };
       const va = (ap, v, premier, compte, prof) => {
         if (v > top.v) top = { v, premier };
-        if (prof > 7 || v >= e.hp * 1.6) return;
+        if (prof > 7 || v >= pvE(e) * 1.6) return;
         for (const sp of ok) {
           const n = compte[sp.id] || 0;
           if (ap < sp.pa || (casts[sp.id] || 0) + n >= sp.parTour || (sp.cd > 0 && n >= 1)) continue;
@@ -5155,14 +5257,14 @@
       finissables.forEach((e) => {
         if (!(e.hp > 0)) return;
         const ici = meilleur(e, moi);
-        if (ici.premier && ici.v >= e.hp) { const poids = profil(e).poids; if (!coup || coup.pas > 0 || poids > coup.poids) coup = { e, pas: 0, premier: ici.premier, poids }; return; }
+        if (ici.premier && ici.v >= pvE(e)) { const poids = profil(e).poids; if (!coup || coup.pas > 0 || poids > coup.poids) coup = { e, pas: 0, premier: ici.premier, poids }; return; }
         if (coup && coup.pas === 0) return;
         if (!(moi.mp > 0) || c.interdits.has('move')) return;
         mesCases(c, moi).forEach((q) => {
           if (!q.d || q.d > moi.mp) return;
           if (coup && coup.pas > 0 && q.d > coup.pas) return;
           const la = meilleur(e, q);
-          if (!la.premier || la.v < e.hp * 1.08) return; // marge : je ne dépense des PM que si le coup de grâce est net
+          if (!la.premier || la.v < pvE(e) * 1.08) return; // marge : je ne dépense des PM que si le coup de grâce est net
           const m = menace(c, moi, q, ennemis), poids = profil(e).poids;
           if (!coup || q.d < coup.pas || (q.d === coup.pas && (poids > coup.poids || (poids === coup.poids && m < coup.m)))) coup = { e, pas: q.d, q, poids, m };
         });
@@ -5301,6 +5403,22 @@
       const pr = profil(e), d = man(moi, e), monPm = c.pmMax || B.monPm || 3;
       if ((pr.portee <= 2 || (pvp && estJoueur(e))) && pr.pm > 0 && d <= pr.pm + pr.portee + monPm) s.val = s.val + 0.6 * pr.poids; // un joueur qui peut m'atteindre : le ralentir vaut un coup
     });
+    // V15.43 — DUEL CONTRE UN BOUCLIER (Susanoo, Parade de fer…) : si je ne le tue pas ce tour-ci et que son bouclier tombe au prochain tour,
+    // je garde mes grosses techniques à recharge (elles seront prêtes quand il n'aura plus rien) et je joue contrôle + petits coups ;
+    // contre la parade du Susanoo (ses premiers coups reçus sont réduits), les petits coups d'abord pour user ses charges.
+    if (pvp) {
+      const f = ennemis.find((e) => e.id === c.focus) || joueursE[0];
+      const sh = f ? Math.max(0, Number(f.shield) || 0) : 0, form = String((f && f.avatar && f.avatar.form) || '');
+      if (f && (sh > 0 || /susanoo/.test(form))) {
+        const fin = Math.min(f.shieldSource && f.shieldSource.turns != null ? f.shieldSource.turns : 9, f.avatar && f.avatar.turns != null ? f.avatar.turns : 9);
+        const total = utilisables.reduce((t, sp) => t + (visible(sp, f) ? (sp.brut != null ? sp.brut : sp.val || 0) * Math.min(sp.cd > 0 ? 1 : (sp.parTour || 1), Math.max(1, Math.floor(moi.ap / Math.max(1, sp.pa || 3)))) : 0), 0);
+        if (sh > 0 && fin <= 1 && total < pvE(f) && sh >= 0.25 * total) {
+          utilisables.forEach((sp) => { if (sp.cd >= 2 && sp.val > 0) sp.val *= 0.02; }); // gardées : seulement si rien d'autre ne porte
+          if (c.ditBouclier !== c.mesTours) { c.ditBouclier = c.mesTours; note('PvP : ' + (f.name || 'adversaire') + ' sous bouclier (' + sh + ') qui tombe au prochain tour — je garde mes grosses techniques et je le contrôle'); }
+        }
+        if (/susanoo-(partial|complete)/.test(form)) utilisables.forEach((sp) => { if (sp.pa <= 3 && sp.cd === 0 && sp.val > 0) sp.val *= 1.25; });
+      }
+    }
     utilisables.sort((a, b) => (b.aff ? 1 : 0) - (a.aff ? 1 : 0));
     const explore = (ap, v, premier, compte, prof) => {
       if (v > mieux.v) mieux = { v, premier, ap: moi.ap - reserve - ap };
@@ -7959,6 +8077,7 @@
         S.inspDone = 1; const ids = String(CFG.inspecter || '').split(/[ ,;]+/).filter((x) => /^[0-9a-f-]{36}$/.test(x));
         ids.forEach((id, i) => setTimeout(() => { try { envoie('player.inspect', { playerId: id }); } catch (e) {} }, 1500 * (i + 1)));
       }
+      if (CFG.mode === 'pvp') { await modePvp(); return; } // V15.43 — Arène en boucle : rien d'autre
       if (CFG.mode === 'eveil') { await modeEveil(); return; } // V15.42 — Tour de l'Éveil en boucle : rien d'autre (ni coffres, ni retour de zone, ni ventes)
       if (await retourApresCoffre()) return; // V14.40 — coffre ouvert : je rentre à mon farm
       if (await retourZone()) return; // V14.78 — hors de mes zones de farm : j'y retourne (sceau de la zone si je l'ai)
@@ -8981,7 +9100,7 @@
     if (cmd === '/aokiri') { if (/^(on|oui|1)/i.test(arg.trim())) { CFG.aokiri = 1; CFG.mode = 'quetes'; } else if (/^(off|non|0)/i.test(arg.trim())) CFG.aokiri = 0; sauve(); return tgDit('🌊 Option Aokiri : ' + (Number(CFG.aokiri) === 1 ? 'activée (coffres, puis quêtes, puis farm au Pays de l’Eau)' : 'désactivée (quêtes sur tout le continent)') + '\n/aokiri on ou /aokiri off'); }
     if (cmd === '/intuable') { if (/^(on|oui|1)/i.test(arg.trim())) CFG.intuable = 1; else if (/^(off|non|0)/i.test(arg.trim())) CFG.intuable = 0; sauve(); return tgDit('🛡 Mode Intuable : ' + (INTU() ? 'activé (97 % de chances minimum, jamais plus de la moitié de mes PV en jeu, repos à 95 %, soins plus tôt)' : 'désactivé') + '\n/intuable on | off'); }
     if (cmd === '/mode') {
-      const m = { eveil: 'eveil', 'éveil': 'eveil', tour: 'eveil', tresor: 'tresor', tresors: 'tresor', 'trésor': 'tresor', 'trésors': 'tresor', treasure: 'tresor', coffre: 'tresor', coffres: 'tresor', groupe: 'groupe', afk: 'groupe', allies: 'groupe', xp: 'xp', quete: 'quetes', quetes: 'quetes', 'quêtes': 'quetes', farm: 'farm', boss: 'boss', donjon: 'donjons', donjons: 'donjons', dj: 'donjons', cles: 'cles', clefs: 'cles', cle: 'cles', clef: 'cles', test: 'test', bestiaire: 'test', ryo: 'ryo', ryos: 'ryo', 'ryō': 'ryo', 'ryōs': 'ryo', argent: 'ryo' }[arg.toLowerCase()];
+      const m = { pvp: 'pvp', arene: 'pvp', 'arène': 'pvp', duel: 'pvp', eveil: 'eveil', 'éveil': 'eveil', tour: 'eveil', tresor: 'tresor', tresors: 'tresor', 'trésor': 'tresor', 'trésors': 'tresor', treasure: 'tresor', coffre: 'tresor', coffres: 'tresor', groupe: 'groupe', afk: 'groupe', allies: 'groupe', xp: 'xp', quete: 'quetes', quetes: 'quetes', 'quêtes': 'quetes', farm: 'farm', boss: 'boss', donjon: 'donjons', donjons: 'donjons', dj: 'donjons', cles: 'cles', clefs: 'cles', cle: 'cles', clef: 'cles', test: 'test', bestiaire: 'test', ryo: 'ryo', ryos: 'ryo', 'ryō': 'ryo', 'ryōs': 'ryo', argent: 'ryo' }[arg.toLowerCase()];
       if (!m) return tgDit('Modes possibles : tresor (coffres), xp, ryo, test, quetes, farm, boss, donjons, clefs, groupe (AFK : rejoindre les combats du groupe seulement), eveil (Tour de l’Éveil en boucle). Actuel : ' + (MODES[CFG.mode] || CFG.mode));
       CFG.mode = m; sauve(); S.cibleId = null; affiche();
       return tgDit('Mode : ' + MODES[m]);
@@ -9419,7 +9538,7 @@
     'farm-pluie': { zoneFarm: 'plaine-grise,tour-du-chef', nivGroupeMin: 150, nivGroupe: 250 },
     'farm-ici': { zoneFarm: '@ici', farmAncre: null }, // V14.87 — la zone où je me trouve au moment du clic (bornes de niveau des Réglages)
   };
-  const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', forge: 'Forgemagie optimale', groupe: 'AFK groupe', eveil: 'Éveil (Tour, étages en boucle)' };
+  const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', forge: 'Forgemagie optimale', groupe: 'AFK groupe', eveil: 'Éveil (Tour, étages en boucle)', pvp: 'PvP (Arène des Kage)' };
   const court = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e4 ? Math.round(n / 1000) + ' k' : String(Math.round(n)));
   let ui = null;
   // Avancement de la quête en cours : étapes terminées + objectifs de l'étape actuelle.
@@ -9792,7 +9911,8 @@
   const OUI = { 1: 'Oui', 0: 'Non' };
   const CATEGORIES = [
     ['Objectif', [
-      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'Farm XP (meilleure zone à mon niveau)', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)', eveil: 'Éveil : Tour de l’Éveil en boucle (étages de mon niveau à 210)' }],
+      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'Farm XP (meilleure zone à mon niveau)', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)', eveil: 'Éveil : Tour de l’Éveil en boucle (étages de mon niveau à 210)', pvp: 'PvP : Arène des Kage en boucle' }],
+      ['pvpFile', 'Mode PvP : file de l’Arène', { '1v1': '1v1', '2v2': '2v2 (avec mon groupe de deux)' }],
       ['djMarge', 'Mode Donjons : niveaux d’avance sur le donjon (15 = prudent)'],
       ['eveilFin', 'Mode Éveil : dernier étage avant de recommencer (210)'],
       ['eveilFaille', 'Mode Éveil : faille préférée', { cauchemar: 'Cauchemar (×2,5 encre, ×1,6 XP)', reflet: 'Reflet (×1,6 encre, ×1,3 XP)', reve: 'Rêve (le plus sûr)' }],
@@ -9882,7 +10002,7 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['farm-ici', 'Farm ici', 'Reste farmer la zone où je suis maintenant · bornes de niveau des Réglages (480 à 640 au départ)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['eveil', 'Éveil', 'Tour de l’Éveil en boucle : de l’étage de mon niveau jusqu’au dernier étage réglé (210), puis je recommence'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['farm-ici', 'Farm ici', 'Reste farmer la zone où je suis maintenant · bornes de niveau des Réglages (480 à 640 au départ)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['pvp', 'PvP', 'Arène des Kage en boucle (1v1) : j’accepte chaque match et je joue les duels en lisant les sorts, portées et boucliers adverses'], ['eveil', 'Éveil', 'Tour de l’Éveil en boucle : de l’étage de mon niveau jusqu’au dernier étage réglé (210), puis je recommence'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
     CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { if (PRESETS_FARM[k]) { Object.assign(CFG, PRESETS_FARM[k], { mode: 'xp', farmPreset: k }); S.spotVise = null; S.spotForce = null; S.ezf = null; } else { CFG.mode = k; CFG.farmPreset = ''; if (k === 'xp') CFG.zoneFarm = ''; } sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
