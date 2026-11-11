@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.41.0
+// @version     15.42.0
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,8 +114,8 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.41-Drarito';
-  const CFG = { inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
+  const VERSION = 'V15.42-Drarito';
+  const CFG = { eveilFin: 210, eveilFaille: 'cauchemar', inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
   Object.assign(CFG, { explore: 1, filtre: '', nivMax: 0, pvMin: 85 }); // 85 % de PV au moins pour lancer un combat : fixe, sans réglage
@@ -671,6 +671,11 @@
     'combat.join': (c) => ({ combatId: String(c.combatId).slice(0, 64) }), // V14.90 — le bouton « Rejoindre » du combat de groupe
     'instance.switch': (c) => ({ instanceId: String(c.instanceId).slice(0, 64) }), // V14.90 — le choix d'instance du jeu (pour être dans la même que mon chef)
     'party.locate': () => ({}),
+    'eveil.read': () => ({}), // V15.42 — TOUR DE L'ÉVEIL (formes exactes du jeu)
+    'eveil.enter': () => ({}),
+    'eveil.wake': () => ({}),
+    'eveil.climb': (c) => (c && c.paid === true ? { paid: true } : {}),
+    'eveil.door': (c) => { if (!/^porte-[1-5]$/.test(String(c && c.doorId))) throw new Error('faille invalide'); return { doorId: c.doorId }; },
     'festival.read': () => ({}), // V15.30 — ouvrir le panneau du Festival des Sceaux (comme le bouton de la boutique) : savoir s'il est en cours
     'ferry.skip': (c) => ({ id: String(c.id).slice(0, 64) }), // V14.96 — « passer la traversée » du bac (le bouton du jeu) // V14.89 — « où sont les membres de mon groupe » (le même message que la carte du groupe du jeu)
     'player.move': (c) => ({ seq: ent(c.seq), dir: { x: axe(c.dir.x), y: axe(c.dir.y) }, sprint: c.sprint === true }),
@@ -1257,8 +1262,21 @@
       if (!S.vus.has('festivalFmt')) { S.vus.add('festivalFmt'); retiens('festival · ' + ev, JSON.stringify(d).slice(0, 600)); }
     } catch (e) {}
   }
+  // V15.42 — TOUR DE L'ÉVEIL : état de la Tour (dehors / vestibule / étage, failles) et résultat de chaque faille.
+  function lisEveil(ev, d) {
+    if (!d || typeof d !== 'object') return;
+    if (ev === 'eveil.state') { if (S.eveilEnVol > 0) S.eveilEnVol--; if (S.eveilJeter > 0) { S.eveilJeter--; return; } /* réponse à une lecture partie avant ma dernière action : périmée (le jeu répond dans l'ordre) */ S.eveil = d; S.eveilT = S.eveilVuT = Date.now(); if (!S.vus.has('eveilFmt')) { S.vus.add('eveilFmt'); retiens('eveil.state', JSON.stringify(Object.assign({}, d, { shop: undefined })).slice(0, 600)); } }
+    else if (ev === 'eveil.result') {
+      S.eveilRes = d; S.eveilA = Date.now() + 1500; S.eveilT = 0; // je relis l'état juste après
+      const E = S.eveilStats = S.eveilStats || { faillesG: 0, faillesP: 0, encre: 0, xp: 0, boucles: 0, depuis: Date.now() };
+      if (d.won) { E.faillesG++; E.encre += Number(d.encre) || 0; E.xp += Number(d.xp) || 0; }
+      else { E.faillesP++; if (d.modifier && d.modifier !== 'reve') S.eveilPrudent = { jusqua: Date.now() + 1800000, niv: d.modifier === 'cauchemar' ? 'reflet' : 'reve' }; }
+      note('🌙 Éveil · étage ' + d.floor + (d.guardian ? ' (gardien)' : '') + ' · faille ' + (d.modifier || '?') + ' : ' + (d.won ? 'gagnée · +' + (d.encre || 0) + ' encre, +' + (d.xp || 0) + ' XP' + (d.chest && d.chest.length ? ' · coffre : ' + d.chest.map((x) => x.quantity + ' × ' + x.itemId).join(', ') : '') : 'perdue — je repars de mon niveau' + (S.eveilPrudent ? ' (failles « ' + S.eveilPrudent.niv + ' » au plus pendant 30 min)' : '')));
+    }
+  }
   function traite(ev, d) {
     lisFestival(ev, d);
+    if (/^eveil\./.test(ev)) lisEveil(ev, d);
     if (d && typeof d === 'object' && /inventory|item|forge|craft|equip|gear|rune|panopl|set\.|vault|stuff/i.test(ev)) { try { S.brutEq = S.brutEq || {}; const j = JSON.stringify(d); if (j.length < 600000) S.brutEq[ev] = j; } catch (e) {} }
     if (d && typeof d === 'object' && /inventory|item|forge|craft|market|shop|vault|bank|coffre|chest|equip|gear|loot|reward/i.test(ev)) { try { apprendNiveaux(d, 0); } catch (e) {} }
     // Groupe et combats d'alliés : j'apprends la forme exacte de ce que le jeu envoie (invitation, membres, combat à rejoindre) avant d'écrire l'option.
@@ -7822,6 +7840,74 @@
     if (S.capHp.niv !== S.niveau || S.hp > S.capHp.v + 1) { S.capHp = null; return; }
     if (S.maxHp > S.capHp.v) S.maxHp = S.capHp.v;
   }
+  // V15.42 — MODE ÉVEIL : la Tour de l'Éveil en boucle, de l'étage de mon niveau (200) jusqu'à CFG.eveilFin (210, un gardien) :
+  // s'endormir → Yumeji : monter gratuitement depuis mon niveau → une faille par étage (le gardien quand il est là, sinon la faille
+  // choisie : Cauchemar par défaut, plus prudent pendant 30 min après une défaite) → passé le dernier étage, se réveiller et recommencer.
+  // Une défaite ramène au Vestibule : je repars gratuitement de mon niveau (jamais la reprise payante).
+  const EVEIL_ORDRE = { cauchemar: ['cauchemar', 'reflet', 'reve'], reflet: ['reflet', 'reve', 'cauchemar'], reve: ['reve', 'reflet', 'cauchemar'] };
+  async function modeEveil() {
+    const now = Date.now(), E = S.eveil, fin = Math.max(1, Number(CFG.eveilFin) || 210);
+    if (now < (S.eveilA || 0)) return;
+    const agit = (ev, c) => { S.eveilActT = Date.now(); S.eveilT = 0; S.eveilJeter = Date.now() - (S.eveilLuT || 0) < 3000 ? (S.eveilEnVol || 0) : 0; S.eveilEnVol = 0; return envoie(ev, c); };
+    const lit = () => { S.eveilLuT = Date.now(); S.eveilEnVol = (S.eveilLuT - (S.eveilLuT0 || 0) < 3000 ? (S.eveilEnVol || 0) : 0) + 1; S.eveilLuT0 = S.eveilLuT; envoie('eveil.read', {}); };
+    if (S.eveilActT && (S.eveilVuT || 0) < S.eveilActT) { // j'attends l'état qui suit ma dernière action : jamais deux fois la même sur un état périmé
+      if (now - S.eveilActT > 3000 && now > (S.eveilLuA || 0)) { S.eveilLuA = now + 3000; S.eveilJeter = 0; lit(); }
+      if (now - S.eveilActT > 60000) S.eveilActT = 0; // plus de réponse depuis 1 min : je reprends sur ce que je sais
+      return;
+    }
+    if (!E || now - (S.eveilT || 0) > 15000) {
+      if (now > (S.eveilLuA || 0)) { S.eveilLuA = now + 4000; lit(); }
+      if (!S.eveilDemA) S.eveilDemA = now; if (now - Math.max(S.eveilVuT || 0, S.eveilDemA) > 60000 && !S.vus.has('eveilMuet')) { S.vus.add('eveilMuet'); note('Éveil : la Tour ne répond pas à la lecture de son état — ouvre-la une fois à la main (bouton Éveil ou F4) pour que je voie sa forme'); }
+      statut('🌙 Éveil : je lis l’état de la Tour…', true); return;
+    }
+    if (E.fighting) { statut('🌙 Éveil · étage ' + E.floor + ' : combat en cours', true); return; }
+    const St = S.eveilStats = S.eveilStats || { faillesG: 0, faillesP: 0, encre: 0, xp: 0, boucles: 0, depuis: now };
+    const resume = ' · ' + St.boucles + ' boucle(s), ' + St.faillesG + ' faille(s) gagnée(s), +' + St.encre + ' encre';
+    if (E.place === 'dehors') {
+      stop(); S.eveilA = now + 4000; S.eveilT = 0;
+      agit('eveil.enter', {});
+      if (!S.vus.has('eveilDort')) { S.vus.add('eveilDort'); note('🌙 Éveil : je m’endors (Tour de l’Éveil, étages ' + (E.freeStart || '?') + ' à ' + fin + ' en boucle)'); }
+      statut('🌙 Éveil : je m’endors…', true); return;
+    }
+    if (E.place === 'vestibule') {
+      if (E.leader === false) { statut('🌙 Éveil : au Vestibule, c’est le chef du groupe qui lance l’ascension', true); return; }
+      if ((Number(E.freeStart) || 0) > fin) { statut('🌙 Éveil : mon niveau (' + E.freeStart + ') dépasse le dernier étage voulu (' + fin + ') — réglez « Éveil : dernier étage »', true); return; }
+      S.eveilA = now + 4000; S.eveilT = 0;
+      agit('eveil.climb', {}); // gratuit, depuis mon niveau — jamais { paid: true }
+      note('🌙 Éveil : ascension depuis l’étage ' + (E.freeStart || '?') + resume);
+      statut('🌙 Éveil : je monte depuis l’étage ' + (E.freeStart || '?'), true); return;
+    }
+    if (E.place === 'etage') {
+      if ((Number(E.floor) || 0) > fin) {
+        S.eveilA = now + 5000; S.eveilT = 0; St.boucles++;
+        agit('eveil.wake', {});
+        note('🌙 Éveil : étage ' + fin + ' passé — je me réveille et je recommence' + resume);
+        statut('🌙 Éveil : je me réveille pour recommencer', true); return;
+      }
+      const portes = (Array.isArray(E.doors) ? E.doors : []).filter((x) => x && /^porte-[1-5]$/.test(String(x.id)));
+      if (!portes.length) { S.eveilT = 0; S.eveilA = now + 2000; statut('🌙 Éveil · étage ' + E.floor + ' : j’attends les failles', true); return; }
+      const pref = S.eveilPrudent && S.eveilPrudent.jusqua > now ? S.eveilPrudent.niv : String(CFG.eveilFaille || 'cauchemar');
+      const ordre = EVEIL_ORDRE[pref] || EVEIL_ORDRE.cauchemar;
+      const rang = (x) => (x.guardian ? -1 : (ordre.indexOf(x.modifier) < 0 ? 9 : ordre.indexOf(x.modifier)));
+      const p = portes.slice().sort((a, b) => rang(a) - rang(b) || (b.encre || 0) - (a.encre || 0))[0];
+      if (S.eveilLoin && S.eveilLoin.id === p.id && S.eveilLoin.floor === E.floor && S.pos && dist(p, S.pos) > 40) {
+        if (S.eveilLoin.n++ < 20 && navigue({ x: p.x, y: p.y, zone: 'eveil', label: 'faille ' + p.id })) { statut('🌙 Éveil · étage ' + E.floor + ' : je marche jusqu’à la faille', true); return; }
+      }
+      stop(); S.eveilA = now + 5000; S.eveilPorte = { id: p.id, floor: E.floor, t: now };
+      agit('eveil.door', { doorId: p.id });
+      const r = await attend((ev, x) => ev.indexOf('combat') === 0 || ev === 'eveil.state' || (ev === 'server.error' && x.scope !== 'world'), 3000);
+      if (r && r.ev === 'server.error') {
+        const code = String(r.d.code || r.d.message || '?');
+        if (/far|loin|dist|range|reach|near|proche/i.test(code)) { S.eveilLoin = { id: p.id, floor: E.floor, n: 0 }; S.eveilA = 0; }
+        else S.eveilA = now + 15000;
+        if (!S.vus.has('eveilErr:' + code)) { S.vus.add('eveilErr:' + code); note('🌙 Éveil : faille ' + p.id + ' refusée (' + code + ')'); }
+        return;
+      }
+      statut('🌙 Éveil · étage ' + E.floor + ' : faille ' + (p.guardian ? 'du gardien' : (p.modifier || '?')) + ' (' + ((p.monsters || []).length || '?') + ' monstres)', true);
+      return;
+    }
+    statut('🌙 Éveil : lieu inconnu « ' + E.place + ' »', true);
+  }
   async function tic() {
     S.ticT = Date.now();
     if (!S.on || occupe) return;
@@ -7873,6 +7959,7 @@
         S.inspDone = 1; const ids = String(CFG.inspecter || '').split(/[ ,;]+/).filter((x) => /^[0-9a-f-]{36}$/.test(x));
         ids.forEach((id, i) => setTimeout(() => { try { envoie('player.inspect', { playerId: id }); } catch (e) {} }, 1500 * (i + 1)));
       }
+      if (CFG.mode === 'eveil') { await modeEveil(); return; } // V15.42 — Tour de l'Éveil en boucle : rien d'autre (ni coffres, ni retour de zone, ni ventes)
       if (await retourApresCoffre()) return; // V14.40 — coffre ouvert : je rentre à mon farm
       if (await retourZone()) return; // V14.78 — hors de mes zones de farm : j'y retourne (sceau de la zone si je l'ai)
       if ((CFG.mode === 'tresor' || coffreHoraire()) && await sceauCoffres()) return; // V14.33 — une fois par heure : un sceau vers le coffre le plus proche d'un sceau
@@ -8894,8 +8981,8 @@
     if (cmd === '/aokiri') { if (/^(on|oui|1)/i.test(arg.trim())) { CFG.aokiri = 1; CFG.mode = 'quetes'; } else if (/^(off|non|0)/i.test(arg.trim())) CFG.aokiri = 0; sauve(); return tgDit('🌊 Option Aokiri : ' + (Number(CFG.aokiri) === 1 ? 'activée (coffres, puis quêtes, puis farm au Pays de l’Eau)' : 'désactivée (quêtes sur tout le continent)') + '\n/aokiri on ou /aokiri off'); }
     if (cmd === '/intuable') { if (/^(on|oui|1)/i.test(arg.trim())) CFG.intuable = 1; else if (/^(off|non|0)/i.test(arg.trim())) CFG.intuable = 0; sauve(); return tgDit('🛡 Mode Intuable : ' + (INTU() ? 'activé (97 % de chances minimum, jamais plus de la moitié de mes PV en jeu, repos à 95 %, soins plus tôt)' : 'désactivé') + '\n/intuable on | off'); }
     if (cmd === '/mode') {
-      const m = { tresor: 'tresor', tresors: 'tresor', 'trésor': 'tresor', 'trésors': 'tresor', treasure: 'tresor', coffre: 'tresor', coffres: 'tresor', groupe: 'groupe', afk: 'groupe', allies: 'groupe', xp: 'xp', quete: 'quetes', quetes: 'quetes', 'quêtes': 'quetes', farm: 'farm', boss: 'boss', donjon: 'donjons', donjons: 'donjons', dj: 'donjons', cles: 'cles', clefs: 'cles', cle: 'cles', clef: 'cles', test: 'test', bestiaire: 'test', ryo: 'ryo', ryos: 'ryo', 'ryō': 'ryo', 'ryōs': 'ryo', argent: 'ryo' }[arg.toLowerCase()];
-      if (!m) return tgDit('Modes possibles : tresor (coffres), xp, ryo, test, quetes, farm, boss, donjons, clefs, groupe (AFK : rejoindre les combats du groupe seulement). Actuel : ' + (MODES[CFG.mode] || CFG.mode));
+      const m = { eveil: 'eveil', 'éveil': 'eveil', tour: 'eveil', tresor: 'tresor', tresors: 'tresor', 'trésor': 'tresor', 'trésors': 'tresor', treasure: 'tresor', coffre: 'tresor', coffres: 'tresor', groupe: 'groupe', afk: 'groupe', allies: 'groupe', xp: 'xp', quete: 'quetes', quetes: 'quetes', 'quêtes': 'quetes', farm: 'farm', boss: 'boss', donjon: 'donjons', donjons: 'donjons', dj: 'donjons', cles: 'cles', clefs: 'cles', cle: 'cles', clef: 'cles', test: 'test', bestiaire: 'test', ryo: 'ryo', ryos: 'ryo', 'ryō': 'ryo', 'ryōs': 'ryo', argent: 'ryo' }[arg.toLowerCase()];
+      if (!m) return tgDit('Modes possibles : tresor (coffres), xp, ryo, test, quetes, farm, boss, donjons, clefs, groupe (AFK : rejoindre les combats du groupe seulement), eveil (Tour de l’Éveil en boucle). Actuel : ' + (MODES[CFG.mode] || CFG.mode));
       CFG.mode = m; sauve(); S.cibleId = null; affiche();
       return tgDit('Mode : ' + MODES[m]);
     }
@@ -9332,7 +9419,7 @@
     'farm-pluie': { zoneFarm: 'plaine-grise,tour-du-chef', nivGroupeMin: 150, nivGroupe: 250 },
     'farm-ici': { zoneFarm: '@ici', farmAncre: null }, // V14.87 — la zone où je me trouve au moment du clic (bornes de niveau des Réglages)
   };
-  const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', forge: 'Forgemagie optimale', groupe: 'AFK groupe' };
+  const MODES = { tresor: 'Chasse aux trésors', xp: 'Farm XP (meilleure zone)', test: 'Test du bestiaire', ryo: 'Ryōs rapides', farm: 'Farm', quetes: 'Quêtes', boss: 'Tuer les boss', donjons: 'Donjons', cles: 'Farm de clefs', brisage: 'Brisage', forge: 'Forgemagie optimale', groupe: 'AFK groupe', eveil: 'Éveil (Tour, étages en boucle)' };
   const court = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e4 ? Math.round(n / 1000) + ' k' : String(Math.round(n)));
   let ui = null;
   // Avancement de la quête en cours : étapes terminées + objectifs de l'étape actuelle.
@@ -9705,8 +9792,10 @@
   const OUI = { 1: 'Oui', 0: 'Non' };
   const CATEGORIES = [
     ['Objectif', [
-      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'Farm XP (meilleure zone à mon niveau)', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)' }],
+      ['mode', 'Mode de jeu', { quetes: 'Quêtes (grade, clan, puis XP)', xp: 'Farm XP (meilleure zone à mon niveau)', farm: 'Farm autour d’ici', boss: 'Tuer les boss', donjons: 'Donjons uniquement', groupe: 'AFK groupe (rejoindre les combats seulement)', eveil: 'Éveil : Tour de l’Éveil en boucle (étages de mon niveau à 210)' }],
       ['djMarge', 'Mode Donjons : niveaux d’avance sur le donjon (15 = prudent)'],
+      ['eveilFin', 'Mode Éveil : dernier étage avant de recommencer (210)'],
+      ['eveilFaille', 'Mode Éveil : faille préférée', { cauchemar: 'Cauchemar (×2,5 encre, ×1,6 XP)', reflet: 'Reflet (×1,6 encre, ×1,3 XP)', reve: 'Rêve (le plus sûr)' }],
       ['djChoisi', 'Donjon à enchaîner (mode Donjons)', () => { const o = { '': 'Automatique : le plus rentable dont j’ai la clef' }; try { entreesDj().map((x) => x && (x.dungeonId || x.id)).filter(Boolean).sort((a, b) => (nivDonjon(a) || 999) - (nivDonjon(b) || 999)).forEach((id) => { o[id] = nomDj(id) + ' · niv. ' + (nivDonjon(id) || '?') + ' · ' + nbEnSac('clef-' + id) + ' clef(s)' + (djRend(id) ? ' · ' + court(djRend(id)) + ' XP/min' : ''); }); if (CFG.djChoisi && !o[CFG.djChoisi]) o[CFG.djChoisi] = CFG.djChoisi; } catch (e) {} return o; }],
       ['testTout', 'Tout tester : chaque sort mesuré 5 fois, chaque marionnette posée 2 fois (plus lent au début, plus juste ensuite)', OUI],
       ['suivis', 'Joueurs dont j’enregistre tout en combat (noms séparés par des virgules)'],
@@ -9793,7 +9882,7 @@
   }
   function corpsObjectif() {
     const z = el('div', 'obj');
-    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['farm-ici', 'Farm ici', 'Reste farmer la zone où je suis maintenant · bornes de niveau des Réglages (480 à 640 au départ)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
+    const CARTES = [['boss', 'Boss', 'Tue les boss du monde dès qu’ils sont là'], ['donjons', 'Donjons', 'Enchaîne les donjons dont il a la clef'], ['tresor', 'Trésors', 'Seulement les coffres mystérieux, du plus proche au plus loin'], ['quetes', 'Quêtes', 'Grade, clan, puis les meilleures quêtes'], ['xp', 'Farm XP', 'Part dans la zone la plus rentable à mon niveau et enchaîne les groupes (revue toutes les 10 min)'], ['farm-tourbillon', 'Farm Île du Tourbillon', 'Uzushio : rivage, ruines Uzumaki, grand tourbillon · groupes de 450 à 608 niveaux, il y reste'], ['farm-pluie', 'Farm Pays de la Pluie', 'Plaine grise + Tour du chef · groupes de 150 à 250 niveaux, il y reste'], ['farm-ici', 'Farm ici', 'Reste farmer la zone où je suis maintenant · bornes de niveau des Réglages (480 à 640 au départ)'], ['groupe', 'AFK groupe', 'Rejoint seulement les combats du groupe'], ['eveil', 'Éveil', 'Tour de l’Éveil en boucle : de l’étage de mon niveau jusqu’au dernier étage réglé (210), puis je recommence'], ['farm', 'Farm', 'Reste et chasse autour d’ici']];
     z.append(el('div', 'sec', 'Que doit faire le bot ?'));
     const grille = el('div', 'cartes'), cb = {};
     CARTES.forEach(([k, nom, txt]) => { const b = el('button', 'carteM'); b.append(el('b', '', nom), el('span', '', txt)); b.onclick = () => { if (PRESETS_FARM[k]) { Object.assign(CFG, PRESETS_FARM[k], { mode: 'xp', farmPreset: k }); S.spotVise = null; S.spotForce = null; S.ezf = null; } else { CFG.mode = k; CFG.farmPreset = ''; if (k === 'xp') CFG.zoneFarm = ''; } sauve(); S.pourQuete = null; S.cibleId = null; note('Mode changé : ' + (MODES[k] || k)); affiche(); dessine(); }; grille.append(b); cb[k] = b; });
