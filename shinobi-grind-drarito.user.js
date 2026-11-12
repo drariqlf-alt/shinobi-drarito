@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Shinobi - Grind
 // @match       https://www.shinobi-online.fr/*
-// @version     15.43.0
+// @version     15.43.1
 // @description Bot Shinobi Online (version stable Drarito, basée sur V14.41 de Ciel)
 // @downloadURL https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
 // @updateURL   https://raw.githubusercontent.com/drariqlf-alt/shinobi-drarito/main/shinobi-grind-drarito.user.js
@@ -114,7 +114,7 @@
   try { if (PERSO !== KINKO) PAR_PERSO.forEach((k) => localStorage.removeItem(k + ':' + KINKO)); } catch (e) {}
 
   // ---------- Réglages (modifiables dans le panneau ⚙) ----------
-  const VERSION = 'V15.43-Drarito';
+  const VERSION = 'V15.43.1-Drarito';
   const CFG = { pvpFile: '1v1', eveilFin: 210, eveilFaille: 'cauchemar', inspecter: '', specFerme: 1, coffreOuvre: 1, evAller: 1, enigmes: 1, brisInutile: 1, venteInutile: 1, suivis: 'Soa', soinEntre: 85, testTout: 1, sansPhys: 1, brisInconnu: '', brisNiv: 0, djChoisi: '', djMarge: 15, cleVisee: '', djSinon: 'cles', voix: 1, voixTg: 1, allies: 'moi', cph: 0, delai: 0, mode: 'xp', seuil: 70, explore: 1, rayon: 800, dmax: 3000, meute: 0, filtre: '', nivMax: 0, pvMin: 90, soin: 1, points: 'force', equip: 1, recomp: 1, vente: 1, essais: 1, eco: 1, noir: 0, prudence: 1, clan: 1, mini: 0, rappel: 1, talents: 1, achatSoins: 1, budgetSoins: 8, soinsVises: 6, ecartNiv: 5, barre: 1, biju: 1, donjons: 1, sceaux: 1, fleche: 1, portes: 1, flecheNav: 0, suivie: 1, sceauxDecouvre: 0, boss: 'tous', garde: 1, quete: '', hdv: 0, hdvPrix: 0, venteRar: '', tab: 1, tgRapport: 2, entretien: 1, alterne: 0, tourne: 1, rythme: 'normal', tgTchat: 1, villagesPrio: 'kumo,iwa,ame', quotidiennes: 1 };
   try { Object.assign(CFG, JSON.parse(localStorage.getItem(CLE('__sg_cfg')) || '{}')); } catch (e) {}
   // Le reste est automatique et n'a plus de réglage : points en Force, équipement, soin, récompenses.
@@ -6317,6 +6317,7 @@
         let v = vMax != null && nbDans(S.inv, runeFm(tk.line, vMax)) > 0 ? vMax : null;
         if (v == null) {
           const auCoffre = vMax;
+          if (auCoffre == null && !coffreOk && estDrarito() && tiers.some((x) => nbDans(S.coffre, runeFm(tk.line, x)) > 0)) continue; // Drarito — coffre fermé pour l'instant : la ligne n'est pas vide, j'attends sa réouverture (ni achat, ni « plus aucune rune »)
           if (auCoffre == null && sess && await achatRunesFm(tk.line)) return true; // V15.41 — plus de rune nulle part : j'en achète à l'hôtel des ventes
           if (auCoffre == null) { F.fini[cle] = Date.now() + 6 * 3600000; if (!S.vus.has('fmSans:' + tk.line)) { S.vus.add('fmSans:' + tk.line); note('Forgemagie : plus aucune rune pour ' + tk.line + ' (sac et coffre) — brisez des pièces qui portent cette ligne'); } continue; }
           const id = runeFm(tk.line, auCoffre), q = Math.min(500, nbDans(S.coffre, id));
@@ -6325,6 +6326,7 @@
           const r = await attend((ev, d) => ev === 'inventory.state' || (ev === 'server.error' && d.scope === 'inventory'), 2500);
           await dort(300);
           if ((!r || r.ev === 'server.error' || nbDans(S.inv, id) < 1) && sess) { S.fmCoffreKO = Date.now() + 600000; if (!S.vus.has('fmCoffreFerme')) { S.vus.add('fmCoffreFerme'); note('Forgemagie : le coffre est fermé — je forge avec les runes du sac. Ouvre ton coffre (au coffre-fort) si tu veux que je prenne aussi celles du coffre'); } return true; }
+          if ((!r || r.ev === 'server.error' || nbDans(S.inv, id) < 1) && estDrarito()) { S.fmCoffreKO = Date.now() + 3600000; note('Forgemagie : retrait de ' + id + ' du coffre refusé (' + (r && r.d.code ? r.d.code : 'sans effet') + ') — je laisse le coffre 1 h et je forge avec les runes du sac'); return true; } // Drarito — le journal montrait ce retrait retenté toutes les 10 min (vault_closed / not_in_vault) en bloquant toute la forgemagie
           if (!r || r.ev === 'server.error' || nbDans(S.inv, id) < 1) { S.fmA = Date.now() + 600000; note('Forgemagie : retrait de ' + id + ' du coffre refusé (' + (r && r.d.code ? r.d.code : 'sans effet') + '), nouvel essai dans 10 min'); return true; }
           note('Forgemagie : ' + nbDans(S.inv, id) + ' × ' + id + ' sorties du coffre');
           return true;
